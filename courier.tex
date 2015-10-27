@@ -1,0 +1,177 @@
+\section{Courier IMAP}
+
+Este programa va a ser el encargado del protocolo IMAP. Tiene varios módulos
+de autentificación. Uno de estos módulos permite usar las librerias de
+vpopmail para obtener la información necesaria. Además, tiene un módulo que
+permite cachear la información de autentificación ahorrando consultas
+innecesarias que acaban en la base de datos.
+
+\subsection{Instalación}
+
+Debe de bajarse el courier-imap de la url
+\emph{http://prdownloads.sourceforge.net/courier/courier-imap-1.7.0.tar.bz2}.
+La configuración de este software no puede hacerse como root. Para ello
+debe usarse una cuenta normal. Puede usarse la cuenta \emph{mailadmin} 
+para ello. La versión a la hora de escribir este documento es la 2.2.1.
+
+En principio este software se va a instalar por defecto en
+\emph{/usr/lib/courier-imap}.
+Los pasos a seguir son lo siguientes:
+\begin{itemize}
+\item Con una cuenta \emph{distinta a root}, descomprimir el fichero,
+configurar y compilar el programa:
+\begin{verbatim}
+bzcat courier-imap-2.2.1.tar.bz2 | tar xvf -
+cd courier-imap-2.2.1
+./configure --with-authpam \
+	--sysconfdir=/etc/courier \
+	--with-authvchkpwd \
+	--without-authldap \
+	--without-authmysql
+make 
+\end{quote}
+En el caso de estar instalándose sobre Fedora, añadir la opción:
+\begin{verbatim}--with-redhat\end{verbatim}
+\item Instalar como root, los binarios (desde el directorio donde se ha
+compilado el programa).
+\begin{verbatim}
+make install
+\end{verbatim}
+
+\item Crear el fichero que arrancará el authdaemond, el programa que se
+encargará de la autentificación. Para ello crear el fichero
+\emph{/etc/init.d/authdaemond}, con el siguiente contenido:
+\begin{verbatim}
+#!/bin/sh
+#
+# chkconfig: 345 95 95 
+# description: authdaemond
+# processname: authdaemond
+prefix=/usr/lib/courier-imap
+
+if [ ! -f /etc/courier/authdaemonrc ]; then
+	exit 1
+fi
+if [ ! -x $prefix/libexec/authlib/authdaemond.plain ]; then
+	exit 1
+fi
+
+. /etc/courier/authdaemonrc
+case "$1" in
+	start)
+		$prefix/libexec/authlib/authdaemond.plain start
+		;;
+	stop)
+		$prefix/libexec/authlib/authdaemond.plain stop
+		;;
+	*)
+		echo "Usage: authdaemond start|stop"
+		exit 1
+esac
+\end{verbatim}
+Darle permiso de ejecución con:
+\begin{verbatim}
+chmod 755 /etc/init.d/autjdaemond 
+\end{verbatim}
+En el caso de la Fedora puede añadirse a los scripts de inicio con la orden:
+\begin{verbatim}
+/sbin/chkconfig --add authdaemond
+\end{verbatim}
+\item Crear el directorio donde van a almacencarse los logs de imap. Este
+directorio será \emph{/var/log/qmail/imapd}. Como root ejecutar las siguiente
+órden:
+\begin{verbatim}
+mkdir -p /var/log/qmail/imapd
+\end{verbatim}
+\item Crear el usuario para los logs, que llamaremos \emph{imaplog}. Cambiar
+el propietario del directorio del paso anterior a este usuario.
+Como root ejecutar:
+\begin{verbatim}
+useradd -M -d /var/log/qmail/imapd imaplog
+useradd -M -d /var/log/qmail/pop3d pop3log
+useradd -M imapd
+useradd -M pop3d
+chown imaplog /var/log/qmail/imapd
+chown pop3log /var/log/qmail/pop3d
+\end{verbatim}
+
+\item Crear los directorios para el servicio y para los logs.
+Establecer los permisos adecuados:
+\begin{verbatim}
+mkdir -p /usr/lib/courier-imap/supervise/imap
+mkdir -p /usr/lib/courier-imap/supervise/imap/log
+chmod 1755 /usr/lib/courier-imap/supervise/imap/log
+mkdir -p /usr/lib/courier-imap/supervise/pop3
+mkdir -p /usr/lib/courier-imap/supervise/pop3/log
+chmod 1755 /usr/lib/courier-imap/supervise/pop3/log
+\end{verbatim}
+\item Crear el script \emph{/usr/lib/courier-imap/supervise/imap/run}  con el
+siguiente contenido:
+\begin{verbatim}
+#!/bin/sh
+USERIMAP=`id -u imapd`
+GROUPIMAP=`id -g imapd`
+exec \
+/usr/local/bin/tcpserver -u "$USERIMAP" -g "$GROUPIMAP" \ 
+-h -R 0 imap \
+/usr/lib/courier-imap/sbin/imaplogin \
+/usr/lib/courier-imap/libexec/authlib/authdaemon \
+/usr/lib/courier-imap/bin/imapd Maildir 2>&1
+\end{verbatim}
+
+\item Crear el script \emph{/usr/lib/courier-imap/supervise/imap/log/run} con el
+siguiente contenido:
+\begin{verbatim}
+#!/bin/sh
+exec \
+/usr/local/bin/setuidgid imaplog \
+/usr/local/bin/multilog t \
+/var/log/qmail/imapd
+\end{verbatim}
+
+\item Crear el fichero \emph{/usr/lib/courier-imap/supervise/pop3/run}
+\begin{verbatim}
+#!/bin/sh
+USERIMAP=`id -u pop3d`
+GROUPIMAP=`id -g pop3d`
+exec \
+/usr/local/bin/tcpserver -u "$USERIMAP" -g "$GROUPIMAP" \ 
+-h -R 0 pop3 \
+/usr/lib/courier-imap/sbin/pop3login \
+/usr/lib/courier-imap/libexec/authlib/authdaemon \
+/usr/lib/courier-imap/bin/pop3d  Maildir 2>&1
+\end{verbatim}
+
+\item Crear el fichero \emph{/usr/lib/courier-imap/supervise/pop3/log/run}:
+\begin{verbatim}
+#!/bin/sh
+exec \
+/usr/local/bin/setuidgid pop3log \
+/usr/local/bin/multilog t \
+/var/log/qmail/pop3d
+\end{verbatim}
+
+
+\item Dar permisos de ejecución a los scripts anteriores y añadir al sistema
+de arranque del supervise:
+\begin{verbatim}
+chmod 755 /usr/lib/courier-imap/supervise/imap/run
+chmod 755 /usr/lib/courier-imap/supervise/imap/log/run
+ln -s /usr/lib/courier-imap/supervise/imap  /service/imap
+chmod 755 /usr/lib/courier-imap/supervise/pop3/run
+chmod 755 /usr/lib/courier-imap/supervise/pop3/log/run
+ln -s /usr/lib/courier-imap/supervise/pop3 /service/pop3
+\end{verbatim}
+
+\item Quitar los permisos en los directorios que se han dado para compilar.
+\begin{quote}
+\bfseries{
+chmod 700 /home/vpopmail/lib
+\newline
+chmod 600 /home/vpopmail/lib/libvpopmail.a
+}
+\end{quote}
+\end{itemize}
+
+En caso de problemas debe de mirarse si el proceso ha arrancado correctamente
+y los archivos de registro creado por el mismo.

@@ -1,0 +1,123 @@
+\section{SquirrelMail}
+
+La aplicación de webmail que va a usarse  está escrita completa en PHP. Para
+consultar el correo que se mostrará a los usuarios utiliza IMAP, mientras que
+para enviar, usa SMTP a través del propio Qmail instalado. Este modo de
+funcionamiento tiene la ventaja de que puede separarse fácilmente la parte de
+webmail a otra máquina.
+
+\subsection{Instalacion}
+
+Debe de bajarse la última versión disponible, que puede encontrase en \emph{
+http://www.squirrelmail.org/download.php}. En el momento de escribir este
+documento la versión disponible es 1.2.11.
+
+El punto donde va a instalarse es \emph{/var/www/webmail}, estando ya Apache
+configurado para trabajar desde ese directorio.
+
+Los pasos a seguir por la instalación son:
+\begin{itemize}
+\item Descomprimir las fuentes:
+\begin{verbatim}
+gunzip -c squirrelmail-1.2.11.tar.gz | tar xvf -
+\end{verbatim}
+\item Cambiar al usuario root. Ir al directorio donde se ha descomprimido las
+fuentes y copiarlas al sitio donde va a ir el webmail:
+\begin{verbatim}
+cd squirrelmail-1.2.11
+cp -r * /var/www/webmail
+\end{verbatim}
+\item Establecer los permisos adecuados. El root debe ser propietario de todos
+los ficheros, exceto del directorio \emph{/var/www/webmail/data} que debe ser
+el usuario y grupo sobre el que se ejecuta Apache. Para ello:
+\begin{verbatim}
+cd /var/www/webmail
+chown -R root.root *
+chown -R apache.apache data
+\end{verbatim} 
+\end{itemize}
+
+\subsection{Configuración}
+
+El webmail tiene un pequeño programa a través del cual se configura. Para ello
+en el directorio donde se ha instalado, se ejecuta ./configure.
+ El menu que sale es el siguiente:
+\begin{verbatim}
+SquirrelMail Configuration : Read: config_default.php (1.2.0)
+---------------------------------------------------------
+Main Menu --
+1.  Organization Preferences
+2.  Server Settings
+3.  Folder Defaults
+4.  General Options
+5.  Themes
+6.  Address Books (LDAP)
+7.  Message of the Day (MOTD)
+8.  Plugins
+9.  Database
+
+D.  Set pre-defined settings for specific IMAP servers
+
+C.  Turn color on
+S   Save data
+Q   Quit
+\end{verbatim}
+
+No olvidar una vez realizado todos los cambios, grabarlos
+
+Debe de configurarse:
+\begin{itemize}
+\item El nombre de la organización y lenguaje por defecto. Para ello, opción
+1, y en menu que aparece:
+\begin{verbatim}
+SquirrelMail Configuration : Read: config_default.php (1.2.0)
+---------------------------------------------------------
+Organization Preferences
+1.  Organization Name      : SquirrelMail
+2.  Organization Logo      : ../images/sm_logo.png
+3.  Org. Logo Width/Height : (308/111)
+4.  Organization Title     : SquirrelMail $version
+5.  Signout Page           :
+6.  Default Language       : en_US
+7.  Top Frame              : _top
+
+R   Return to Main Menu
+C.  Turn color on
+S   Save data
+Q   Quit
+
+Command >>
+
+\end{verbatim}
+Camnbiamos \emph{Organization Name} y \emph{Organization Title} a lo que se desee, en
+nuestro caso Reinos Olvidados, y el \emph{Default Language} a \emph{es\_ES}.
+
+\item Cambiar la configuración del servidor de correo. Para ello desde el menú
+principal, opción 2, sale el siguiente menu:
+\begin{verbatim}
+SquirrelMail Configuration : Read: config_default.php (1.2.0)
+---------------------------------------------------------
+Server Settings
+1.  Domain               : mydomain.com
+2.  IMAP Server          : localhost
+3.  IMAP Port            : 143
+4.  Use Sendmail/SMTP    : SMTP
+6.    SMTP Server        : localhost
+7.    SMTP Port          : 25
+8.    Authenticated SMTP : false
+9.    POP Before SMTP    : false
+10. Server               : cyrus
+11. Invert Time          : false
+12. Delimiter            : detect
+
+R   Return to Main Menu
+C.  Turn color on
+S   Save data
+Q   Quit
+
+Command >>
+\end{verbatim}
+
+Debe de cambiarse \emph{Domain} al dominio primario que se esté usando. Debe
+de cambiarse el tipo de \emph{Server} (opción 11) a \emph{courier}.
+\end{itemize}

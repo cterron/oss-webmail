@@ -1,0 +1,63 @@
+\section{Utilidades de mail}
+
+En esta sección se hablará de como instalar algunas de las utilidades que nos
+aportarán funcionalidad a todo el sistema: gestores de listas de correos y 
+autoresponders.
+
+\subsection{ezmlm}
+
+Este es un software del mismo autor del qmail, que permite una fácil creación
+de listas de correo. Permite que cada usuario sea capaz de crear una lista sin
+tener que estar molestando a los administradores del sistema. 
+
+\subsubsection{Instalación}
+
+La última versión disponible es la 0.53, que puede bajarse de la url
+\emph{http://cr.yp.to/software/ezmlm-0.53.tar.gz}. Los ficheros de
+configuración por defecto son \emph{conf-qmail}, \emph{conf-bin} y
+\emph{conf-man}, que indican donde está situado qmail, donde irán los binarios
+del gestor de lista y donde irán las páginas de manual. En este trabajo se
+quedará todo en su sitio por defecto. 
+
+Para instalar el programa deben seguirse  los siguientes pasos:
+
+\begin{itemize}
+\item Descomprimir las fuentes, pasar al directorio resultante y compilar las
+fuentes:
+\begin{verbatim}
+gunzip -c  ezmlm-0.53.tar.gz | tar xvf-
+cd ezmlm-0.53
+make
+make man
+\end{verbatim}
+\item Como \emph{root}, instalar los binarios:
+\begin{verbatim}
+make setup
+\end{verbatim}
+\end{itemize}
+
+\subsection{Autoresponder}
+
+Este pequeño programa sirve para generar respuestas automáticas junto con
+Qmail. 
+
+\subsubsection{Instalación}
+
+El programa puede bajarse de la url
+\emph{http://www.inter7.com/devel/autorespond-2.0.2.tar.gz}. Necesita saber la
+localización del directorio de Qmail. Sin embargo, como se está usando la
+instalación por defecto, no es necesario modificar nada. El programa se
+instalará por defecto en \emph{/usr/local/bin}.  Para instalarlo deben
+de seguirse los siguientes pasos:
+\begin{itemize}
+\item Descomprimir las fuentes, cambiar al directorio resultante y compilar
+las fuentes:
+\begin{verbatim}
+gunzip -c autorespond-2.0.2.tar.gz | tar xvf - 
+make
+\end{verbatim}
+\item Como \emph{root}, instalar el programa
+\begin{verbatim}
+make install
+\end{verbatim}
+\end{itemize}

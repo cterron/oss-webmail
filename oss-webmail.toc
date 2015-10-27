@@ -1,0 +1,68 @@
+\select@language {spanish}
+\contentsline {section}{\numberline {1}Objetivos}{4}
+\contentsline {section}{\numberline {2}La soluci\'on}{5}
+\contentsline {subsection}{\numberline {2.1}El sistema operativo}{5}
+\contentsline {subsection}{\numberline {2.2}El MTA}{5}
+\contentsline {subsection}{\numberline {2.3}Servidor de POP3 e IMAP}{6}
+\contentsline {subsection}{\numberline {2.4}Servidor de base de datos}{6}
+\contentsline {subsection}{\numberline {2.5}Servidor de Web}{7}
+\contentsline {subsection}{\numberline {2.6}Software auxiliar}{8}
+\contentsline {subsubsection}{\numberline {2.6.1}Cache de DNS}{8}
+\contentsline {section}{\numberline {3}Configuraci\'on del sistema operativo}{8}
+\contentsline {subsection}{\numberline {3.1}Algunas notas de la instalaci\'on}{9}
+\contentsline {subsection}{\numberline {3.2}Software que debe de instalarse}{10}
+\contentsline {subsection}{\numberline {3.3}Asegurando el sistema}{10}
+\contentsline {subsubsection}{\numberline {3.3.1}Parar servicios innecesarios}{10}
+\contentsline {subsubsection}{\numberline {3.3.2}Revisar los usuarios}{11}
+\contentsline {subsubsection}{\numberline {3.3.3}Configurar el acceso}{12}
+\contentsline {subsection}{\numberline {3.4}Configuraci\'on de directorios y PATH}{12}
+\contentsline {subsection}{\numberline {3.5}Quitar el MTA por defecto}{13}
+\contentsline {section}{\numberline {4}Instalaci\'on de programas auxiliares}{13}
+\contentsline {subsection}{\numberline {4.1}Daemontools}{13}
+\contentsline {subsubsection}{\numberline {4.1.1}Una nota sobre los ficheros de logs}{14}
+\contentsline {subsection}{\numberline {4.2}ucspi-tcp}{14}
+\contentsline {section}{\numberline {5}Cach\'e de DNS}{14}
+\contentsline {subsection}{\numberline {5.1}Instalaci\'on}{14}
+\contentsline {section}{\numberline {6}QMAIL}{16}
+\contentsline {subsection}{\numberline {6.1}Instalaci\'on}{16}
+\contentsline {subsection}{\numberline {6.2}Configuraci\'on}{18}
+\contentsline {subsubsection}{\numberline {6.2.1}Configuraci\'on del MTA}{18}
+\contentsline {subsubsection}{\numberline {6.2.2}Scripts de arranque}{19}
+\contentsline {subsubsection}{\numberline {6.2.3}Instalaci\'on de los alias b\'asicos}{21}
+\contentsline {subsubsection}{\numberline {6.2.4}Protecci\'on antirelay}{21}
+\contentsline {subsubsection}{\numberline {6.2.5}Arranque del sistema}{22}
+\contentsline {subsection}{\numberline {6.3}Funcionamiento}{23}
+\contentsline {section}{\numberline {7}Base de datos}{24}
+\contentsline {subsection}{\numberline {7.1}Instalaci\'on}{24}
+\contentsline {section}{\numberline {8}Vpopmail}{25}
+\contentsline {subsection}{\numberline {8.1}Instalaci\'on}{25}
+\contentsline {section}{\numberline {9}Courier IMAP}{26}
+\contentsline {subsection}{\numberline {9.1}Instalaci\'on}{26}
+\contentsline {section}{\numberline {10}Utilidades de mail}{30}
+\contentsline {subsection}{\numberline {10.1}ezmlm}{30}
+\contentsline {subsubsection}{\numberline {10.1.1}Instalaci\'on}{30}
+\contentsline {subsection}{\numberline {10.2}Autoresponder}{31}
+\contentsline {subsubsection}{\numberline {10.2.1}Instalaci\'on}{31}
+\contentsline {section}{\numberline {11}Apache}{31}
+\contentsline {subsection}{\numberline {11.1}Qmailadmin}{33}
+\contentsline {section}{\numberline {12}SquirrelMail}{34}
+\contentsline {subsection}{\numberline {12.1}Instalacion}{34}
+\contentsline {subsection}{\numberline {12.2}Configuraci\'on}{35}
+\contentsline {section}{\numberline {13}Administraci\'on del sistema}{37}
+\contentsline {subsection}{\numberline {13.1}Gesti\'on de dominios}{37}
+\contentsline {subsection}{\numberline {13.2}Gesti\'on de usuarios}{38}
+\contentsline {subsection}{\numberline {13.3}Herramientas gr\'aficas de administraci\'on}{39}
+\contentsline {section}{\numberline {14}Introducci\'on al correo de Internet}{44}
+\contentsline {subsection}{\numberline {14.1}Direcciones}{45}
+\contentsline {subsection}{\numberline {14.2}Protocolo SMTP}{46}
+\contentsline {section}{\numberline {15}Qmail a fondo}{47}
+\contentsline {subsection}{\numberline {15.1}Entrada de correo via SMTP}{47}
+\contentsline {subsection}{\numberline {15.2}Entrada de correo via inyecci\'on local}{48}
+\contentsline {subsection}{\numberline {15.3}Encolado de correo}{51}
+\contentsline {subsection}{\numberline {15.4}Gesti\'on de la cola de salida}{51}
+\contentsline {subsection}{\numberline {15.5}Entrega de correo local}{53}
+\contentsline {subsubsection}{\numberline {15.5.1}Extensiones de direcciones}{53}
+\contentsline {subsubsection}{\numberline {15.5.2}Alias locales}{55}
+\contentsline {subsection}{\numberline {15.6}Entrega de correo remoto}{55}
+\contentsline {subsection}{\numberline {15.7}Asignaci\'on de direcciones de correo a usuarios}{56}
+\contentsline {subsection}{\numberline {15.8}qmail y vpopmail}{57}

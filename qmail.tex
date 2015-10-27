@@ -1,0 +1,373 @@
+\section{QMAIL}
+
+A lo largo de esta sección va documentarse la instalación, funcionamiento y
+configuración de qmail. Dada la particular configuración de arranque que va a
+usarse, deben de tenerse instalado las daemontools y ucspi-tcp para el
+correcto funcionamiento de qmail.
+º
+\subsection{Instalación}
+
+La página web del programa puede encontrarse en
+\emph{http://cr.yp.to/qmail.html}. La última versión disponible a la hora de
+escribir este documento es la 1.03. La URL para bajarse el software es:
+
+\emph{http://cr.yp.to/software/qmail-1.03.tar.gz}.
+
+
+Son necesarios dos parches para qmail. El primero para que reconozca 
+la dirección 0.0.0.0 como local, y el segundo para que pueda compilarse 
+con versiones recientes de la glibc (debido a un cambio en la implementación
+de errno),
+\begin{verbatim}
+http://www.suspectclass.com/~sgifford/qmail/qmail-0.0.0.0.patch
+http://www.qmail.org/moni.csi.hu/pub/glibc-2.3.1/qmail-1.03.errno.patch
+\end{verbatim}
+
+A continuación se detallan los pasos de instalación, suponiendo que la misma
+empieza desde cero.  Durante toda la
+instalación se supone que el software se instala en la ruta por defecto, es
+decir \emph{/var/qmail}.
+
+\begin{enumerate}
+\item Descomprimir el fichero:
+\begin{verbatim}
+gunzip -c qmail-1.03.tar.gz|tar xvf -
+\end{verbatim}
+\item Aplicar los parches. Cambiar al directorio donde se ha descomprimido el
+software y ejecutar con cada uno de los parches:
+\begin{verbatim}
+patch -p1 < ruta_al_parche
+\end{verbatim}
+\item Crear el directorio donde se instalará qmail:
+\begin{verbatim}
+mkdir -p /var/qmail
+\end{verbatim}
+\item Crear los usuarios necesarios para la ejecución de qmail. Estos usuarios
+no deben de existir en el sistema, si se parte de una instalación de cero.
+Para ello debe ejecutarse como \emph{root} la siguiente secuencia de ordenes:
+\begin{verbatim}
+groupadd nofiles
+useradd -M -g nofiles -d /var/qmail/alias alias
+useradd -M -g nofiles -d /var/qmail qmaild
+useradd -M -g nofiles -d /var/qmail qmaill
+useradd -M -g nofiles -d /var/qmail qmailp
+groupadd qmail
+useradd -M -g qmail -d /var/qmail qmailq
+useradd -M -g qmail -d /var/qmail qmailr
+useradd -M -g qmail -d /var/qmail qmails
+\end{verbatim}
+\item Compilar e instalar el software:
+\begin{verbatim}
+make
+make setup check # Esta orden debe de hacer como root.
+\end{verbatim}
+\item Desactivar el mta por defecto que trae la distribución y crear un enlace
+simbólico al programa  que se encarga de inyectar el correo. Lo más sencillo
+es desactivar exim (mta por defecto de Debian) o sendmail (mta por defecto de 
+Fedora) en los scripts de arranque con ayuda de ntsysv o rcconf.
+\begin{verbatim}
+cd /usr/sbin
+mv sendmail sendmail.old
+ln -s /var/qmail/bin/sendmail /usr/sbin/sendmail
+\end{verbatim}
+\end{enumerate}
+
+Una vez compilado, la instalación genera la estructura de directorios de la
+siguiente tabla y copia los ficheros adecuados a cada localización.
+\begin{quote}
+\begin{tabular}{|l|l|}
+	 \hline 
+	 /var/qmail/bin & Binarios \\
+	 /var/qmail/alias & Directorio de alias del sistema\\
+	 /var/qmail/boot & Contiene varios scripts de arranque \\
+	 /var/qmail/control & Los ficheros de configuración  \\
+	 /var/qmail/doc & Documentación \\
+	 /var/qmail/man & Páginas man \\
+	 /var/qmail/queue & Cola de correo \\
+  	 /var/qmail/users & Base de datos de usuarios  \\
+	 \hline
+\end{tabular}
+\end{quote}
+
+\subsection{Configuración}
+
+En esta primera fase de configuración se necesita el nombre completo de la
+máquina en Internet (conocido por las siglas FQDN). A lo largo de este
+documento se usará el dominio ficticio \emph{webmail.reinos.org}. En caso 
+de no disponer de un dominio, se puede usar la dirección IP de la
+máquina\footnote{En caso de tener una varias interfaces de red, debe de usarse
+aquella que esté abierta a Internet}. En el documento se usará  la
+dirección \emph{192.168.1.1}.
+
+\subsubsection{Configuración del MTA}
+El primer fichero importante a mirar es \emph{/var/qmail/control/me}. Tiene
+una sola linea donde esta el FQDN de la máquina o bien la dirección principal
+de internet entre corchetes es decir:
+
+\begin{verbatim}
+webmail.reinos.org
+o
+[192.168.1.1]
+\end{verbatim}
+
+El correo dirigido a
+usuario@localhost debe ser considerado como local. También debe de poder
+recibirse corro con un RCPT TO: usuario@localhost. Para ello debe de añadirse
+la linea \emph{localhost}  a los ficheros \emph{/var/qmail/control/locals} y
+\emph{/var/qmail/control/rcpthosts} (en caso de que no existan deben de
+crearse dichos ficheros). Deben de tener permisos adecuados (\textbf{chmod
+644} \emph{fichero}).
+
+
+\subsubsection{Scripts de arranque}
+
+El arranque  se integra con las daemontools. Concretamente una de las
+utilidades, denominada \emph{supervise}, es la encarga de monitorizar los
+daemon de qmail, rearrancándolos en caso de caida o error. Para ello explora
+una serie de directorios con una estructura particular\footnote{Puede
+encontrarse más información en
+http://cr.yp.to/daemontools/faq/create.html\#runlog}.
+
+\begin{itemize}
+\item Crear los directorios de los servicios. Para ello se ejecutan la
+siguiente secuencia de órdenes como root:
+\begin{verbatim}
+mkdir -p /var/qmail/supervise
+mkdir -p /var/qmail/supervise/qmail
+mkdir -p /var/qmail/supervise/qmail/log
+chmod 1755 /var/qmail/supervise/qmail
+mkdir -p /var/qmail/supervise/qmail-smtpd
+mkdir -p /var/qmail/supervise/qmail-smtpd/log
+chmod 1755 /var/qmail/supervise/qmail-smtpd
+\end{verbatim}
+\item Crear los directorios donde se guardarán los archivos de registro. Para
+ello ejecutar las siguientes órdenes como root:
+\begin{verbatim}
+mkdir -p /var/log/qmail
+mkdir -p /var/log/qmail/qmail
+mkdir -p /var/log/qmail/qmail-smtpd
+chown qmaill /var/log/qmail/qmail
+chown qmaill /var/log/qmail/qmail-smtpd
+\end{verbatim}
+\item Crear los siguientes scripts con el contenido indicado:
+\begin{itemize}
+\item \emph{/var/qmail/rc}
+\begin{verbatim}
+#!/bin/sh
+exec env - PATH="/var/qmail/bin:$PATH" \
+qmail-start ./Maildir/ 2>&1
+\end{verbatim}
+\item \emph{/var/qmail/supervise/qmail/run}
+\begin{verbatim}
+#!/bin/sh
+exec /var/qmail/rc	
+\end{verbatim}
+\item \emph{/var/qmail/supervise/qmail/log/run}
+\begin{verbatim}
+#!/bin/sh
+MAXLOGSIZE=1048576
+NUMLOG=7
+exec /usr/local/bin/setuidgid qmaill  \
+/usr/local/bin/multilog ssize $MAXLOGSIZE nnum \
+$NUMLOG t /var/log/qmail/qmail
+\end{verbatim}
+\item \emph{/var/qmail/supervise/qmail-smtpd/run}
+\begin{verbatim}
+#!/bin/sh
+QMAILDUID=`id -u qmaild`
+NOFILESGID=`id -g qmaild`
+MAXMEM=4000000
+exec /usr/local/bin/softlimit -m $MAXMEM \
+/usr/local/bin/tcpserver -l 0 -H -v -p \
+-x /etc/tcp.smtp.cdb \
+-u $QMAILDUID -g $NOFILESGID  0 smtp  \
+/var/qmail/bin/qmail-smtpd 2>&1
+\end{verbatim}
+Este script tiene dos particularidades: establece un máximo de \emph{bytes} de
+memoria que puede consumir el proceso tcpserver, y por tanto el proceso
+qmail-smtpd. En este caso está fijado a 4 MB. Puede ajustarse asignando el
+valor requerido a \emph{MAXMEM} en el script. La otra particularidad es el
+fichero \emph{/etc/tcp.smtp.cdb} del cual se hablará un poco más adelante.
+\item \emph{/var/qmail/supervise/qmail-smtpd/log/run}. Este script es el
+encargado de recoger los logs generados por \emph{qmail-smtpd}. Por defecto,
+el programa que escribe los logs a disco guarda 10 y los rota cuando llega a
+99999, lo cual es insuficiente para un sitio con mucho tráfico.
+\begin{verbatim}
+#!/bin/sh
+MAXLOGSIZE=1048576
+NUMLOG=7
+exec /usr/local/bin/setuidgid qmaill \
+/usr/local/bin/multilog ssize\ $MAXLOGSIZEnnum $NUMLOG \
+ t /var/log/qmail/smtpd
+\end{verbatim}
+\end{itemize}
+
+Una vez creado los scritps debe de dársele a los mismos permisos de ejecución
+con la orden:
+\begin{verbatim}
+chmod 755 script
+\end{verbatim}
+% Fin de la configuración de los scripts
+
+\end{itemize}
+
+\subsubsection{Instalación de los alias básicos}
+
+Para tener correctamente configurado el sistema  debe de existir la dirección
+de correo \emph{postmaster}. También hay que generar aliases para las cuentas
+\emph{root} y \emph{$MAILER-DAEMON$}. En la configuración propuesta la cuenta
+de usuario \emph{mailadmin}. Para ello deben de crearse los siguientes
+ficheros,  todos deben de tener el mismo contenido (\emph{\&mailadmin@localhost}) y 
+darle permisos adecuados con la orden \textbf{chmod 644} \emph{fichero}.
+\begin{verbatim}
+	/var/qmail/alias/.qmail-mailer-daemon
+	/var/qmail/alias/.qmail-root
+	/var/qmail/alias/.qmail-postmaster	
+\end{verbatim}
+
+Como se va a usar entrega de correo local debe de crearse el Maildir (el tipo
+de buzón de correo que vamos a usar) en la cuenta mailadmin. Para ello
+ejecutamos la orden:
+\begin{verbatim}
+/var/qmail/bin/maildirmake ~mailadmin/Maildir
+\end{verbatim}
+
+\subsubsection{Protección antirelay}
+
+Hoy en día el correo basura (spam) se ha convertido para mucha gente un
+problema. Por defecto, qmail no realiza relay de correo, es decir, no recibe
+un correo de un dominio externo y lo manda a otro dominio externo. Sin
+embargo, en un momento dado, puede que se quiera  aprovechar el servidor de
+correo  smtp para la empresa. Para ello va a crearse el fichero,
+\emph{tcp.smtp}, el cual se convertirá  
+ a un formato especial con ayuda del programa tcprules (del paquete
+ucspi-tcp), y este fichero generado, va a pasarse como parámetro en los
+scripts de arranque de qmail-smtpd (como puede verse en el fichero
+\emph{/var/qmail/supervise/qmail-smtpd/run}).
+
+Por ejemplo, si se quiere que el sistema de correo acepte relay desde la subred
+10.0.0.0/24 y desde la máquina local (localhost, identificado normalmente por
+la red 127.0.0.0/8), tendrá   que crearse el siguiente fichero
+\emph{tcp.smtp}:
+\begin{verbatim}
+127.:allow,RELAYCLIENT=""
+10.0.0.:allow,RELAYCLIENT=""
+\end{verbatim}
+
+Posteriormente se procesa dicho fichero para crear  \emph{/etc/tcp.smtp.cdb},
+ que es el fichero que va a usar el programa tcpserver para establecer
+ la variable RELAYCLIENT, que hace que
+qmail-smtpd ignore el fichero \emph{/var/qmail/control/rcpthost} y  permita
+el relay a las direcciones autorizadas.
+Para crear dicho fichero se ejecuta la orden:
+\begin{verbatim}
+	tcprules /etc/tcp.smtp.cdb ficherotemporal < /etc/tcp.smtp
+\end{verbatim} 
+
+Esta orden debe de repetirse cada vez que se cambia el fichero
+\emph{/etc/tcp.smtp} y rearrancarse el proceso que lo usa (se verá más
+adelante como se realiza esto).
+
+El formato que usa el fichero \emph{/etc/tcp.smtp} puede encontrarse en
+\newline
+\emph{http://cr.yp.to/ucspi-tcp/tcprules.html} y se describe en el apéndice
+XXX.
+
+
+\subsubsection{Arranque del sistema} 
+
+qmail se arranca a través de svscan. Para ello, es necesario poner los scripts
+creados en los apartados anteriores bajo el control del mismo:
+\begin{verbatim}
+ln -s /service/qmail /var/qmail/supervise/qmail
+ln -s /service/qmail-smtpd /var/qmail/supervise/qmail-smtpd
+\end{verbatim}
+
+Con estas instruciones debe de estar arrancado qmail. Debe de probarse que
+funciona adecudamente. Para ello debe de tenerse instalado un cliente de
+correo que entienda el formato Maildir, como por ejemplo mutt.
+
+Para probar, debe de entrar en el sistema a través de la cuenta mailadmin. Una
+vez dentro, configuramos mutt para que busque el correo en el Maildir. Para
+ello basta con asignar a la variable  \emph{MAIL} la ruta completa hacia el
+Maildir. Por ejemplo, usando bash como shell:
+\begin{verbatim}
+export MAIL="$HOME/Maildir"
+\end{verbatim}
+
+Para probar si el sistema entrega el correo local correctamente puede
+ejecutarse la orden:
+\begin{verbatim}
+echo to: mailadmin | /var/qmail/bin/qmail-inject
+\end{verbatim}
+
+Con mutt puede comprobarse si ha llegado correctamente el mail y comprobar que 
+en el fichero de log del qmail, \emph{/var/log/qmail/qmail/current}.
+
+Para comprobar que funciona correctamente los errores en caso de no existencia
+de una cuenta local, puede mandarse un correo a una cuenta no existente con la
+orden:
+\begin{verbatim}
+echo to: noexiste | /var/qmail/bin/qmail-inject
+\end{verbatim}
+
+Puede comprobarse con el mutt que hemos recibido un mensaje de respuesta de
+qmail indicando la condicción de error. En el mismo fichero de error que el
+caso anterior.
+
+Para comprobar que funciona correctamente el envio a Intenet, se necesita una
+cuenta de correo remota. Si la cuenta es \emph{yo@unlugarlejano.com}, puede
+probarse la siguiente orden.
+
+\begin{verbatim}
+echo to: yo@unlugarlejano.com | /var/qmail/bin/qmail-inject
+\end{verbatim} 
+
+Puede comprobarse en el buzón remoto se ha recibido el correo. Puede también
+revisarse los logs en el mismo sitio anterior.
+
+Por último hay que comprobar que funciona correctamente la cuenta de
+\emph{postmaster}. Para se manda un mail local al postmaster de la siguiente
+manera:
+\begin{verbatim}
+echo to: postmaster | /var/qmail/bin/qmail-inject
+\end{verbatim}
+
+Como se ha configurado la cuenta \emph{mailadmin}, ese mail debe de llegar a
+dicha cuenta. 
+
+En caso de existir problemas, debe de comprobarse los ficheros de log de
+qmail.
+
+
+\subsection{Funcionamiento}
+
+En esta sección se hace un pequeño resumen de la estructura y 
+ funcionamiento deqmail.  Los diferentes componentes de qmail son:
+
+\begin{itemize}
+	\item \textbf{qmail-smtpd:} Se encarga de recibir el correo
+a través del protocolo SMTP. Normalmente es lanzado de un superserver como
+inetd, xinetd o tcpserver (el que se usará). Además se encarga del control de
+relay.
+	\item \textbf{qmail-inject:} Se encarga de añadir y reescribir las
+cabeceras de los mensajes que le llegan a través de la entrada estándar y de
+pasar ese mensaje al qmail-queue. También se encarga de tratar las direcciones
+de correo.
+	\item \textbf{qmail-queue:} Se encarga de meter el correo en la cola de
+salida para su posterior envio por qmail-send.
+	\item \textbf{qmail-send:} Se encarga de procesar la cola de salida.
+	\item \textbf{qmail-lspawn:} Se encarga programar las entregas de correo
+local.
+	\item \textbf{qmail-local:} Se encarga de la entrega de correo local. Su
+comportamiento lo puede controlar el usuario.
+	\item \textbf{qmail-rspawn:} Se encarga de programar las entregas de
+correo remoto.
+	\item \textbf{qmail-remote:} Se encarga de enviar un mail a través de
+SMTP. 
+\end{itemize}
+
+A continuación se incluye un gráfico de como se interrelacionan los diferentes
+procesos:
+
+\includegraphics[clip=true]{qmail-proc}

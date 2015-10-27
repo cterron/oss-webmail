@@ -1,0 +1,39 @@
+\section{Base de datos}
+La  base de datos usada va a ser MySQL. En ella se almacenará la información
+necesaria de los dominios y usuarios.
+
+\subsection{Instalación}
+
+Hay que instalar tanto el motor de base de datos como el soporte necesario
+para desarrollar. Esto debe hacerse antes de compilar el vpopmail.
+
+Lo primero que debe de hacerse una vez instalado es darle una password de
+administrador al servidor. Una vez que el servidor de base de datos esté
+instalado, debemos de asegurarnos que el servidor está arrancado\footnote{En
+Redhat se arranca con /etc/init.d/mysqld start} y darle una password al
+usuario de root:
+\begin{verbatim}
+mysqladmin password passwordnueva
+\end{verbatim}
+Donde \emph{passwordnueva} es la clave que se le da al administrador de la
+misma.
+
+Ahora debe de crearse la base de datos que va a usarse para el vpopmail, crear
+el usuario para que el vpopmail acceda a la misma y darle los permisos
+adecuados:
+\begin{enumerate}
+\item Conectarse a la base de datos con el usuario de root. El sistema
+preguntará por la clave dicho usuario y una vez que se haya autentificado
+correctamente, nos presentará el prompt de mysql:
+\begin{verbatim}
+mysql -u root -p
+\end{verbatim}
+\item Se crea la base de datos y el usuario, con las siguientes ordenes en el
+prompt de mysql. Si el usuario que accede a la base de datos es \emph{vpopmail}
+ y la clave del mismo es \emph{myclave}
+\begin{verbatim}
+create database vpopmail;
+grant all on vpopmail.* to vpopmail identified by 'myclave';
+flush privileges;
+\end{verbatim}
+\end{enumerate}

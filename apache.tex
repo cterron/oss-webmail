@@ -1,0 +1,126 @@
+\section{Apache}
+
+Apache es el servidor web que se va usar en el proyecto para dar soporte a un
+webmail y a una pequeña utilidad de administración de los diferentes dominios.
+Hay que asegurarse que se está instalando la última versión disponible para
+la distribución, puesto que hay ciertos problemas de seguridad serios que
+están resueltos en ellos.
+
+En esta sección también se describe como instalar el cgi \emph{qmailadmin} que
+va a usarse para configurar los dominios virtuales una vez creados.
+
+Debe de decidirse también el puerto donde va escuchar el servicio de
+administración. Es aconsejable, si se dispone de dos interfaces de red, una
+abierta al exterior y otra de administración, la parte que se encarga de la
+administración debe de escuchar en la interna.
+
+En esta sección no entrará en profundidad en las diferentes opciones de
+configuración de Apache, puesto que la complejidad del mismo puede abarcar más
+de un libro. Toda la documentación del servidor web puede encontrarse en la 
+\emph{http://httpd.apache.org/docs/}.
+
+Se van a crear dos sitios web, uno de ellos se utilizará para  el webmail,
+mientras que el otro se utilizará para la administración del sitio. En este
+ejemplo en la web principal va a estar el webmail y la zona de administración
+se va configurar en otra dirección IP y en un puerto distinto del 80. Los
+datos pueden consultarse en la maqueta. 
+
+El fichero de configuración de Apache se encuentra en la Redhat 7.3 en
+\emph{/etc/httpd/conf/httpd.conf}. Este archivo viene por defecto viene
+configurado con un montón de opciones para la Redhat.  Se comentarán las
+opciones que deben añadirse o modificarse.
+
+Los pasos a seguir para configurar Apache son los siguientes.
+
+\begin{itemize}
+\item Crear los directorios donde va a colocarse el webmail, la utilidad de
+administración y los ficheros de logs. Los pasos a dar son:
+\begin{verbatim}
+mkdir -p /var/log/httpd
+mkdir -p /var/log/httpd/webmail
+mkdir -p /var/log/httpd/qmailadmin
+mkdir -p /var/www/webmail
+mkdir -p /var/www/qmailadmin
+mkdir -p /var/www/qmailadmin/cgi-bin
+\end{verbatim}
+\item Modificar la parte global de Apache con las opciones siguientes:
+\begin{itemize}
+	\item Añadir las siguientes lineas para que escuche en los puertos
+necesarios:
+\begin{verbatim}
+Listen 80
+Listen 192.168.0.1:2000
+\end{verbatim}	
+	\item Cambiar la raíz del documento al webmail. Para ello, localizar
+	la línea:
+\begin{verbatim}
+DocumentRoot "/var/www/html"
+ cambiarla a
+DocumentRoot "/var/www/webmail"
+ Localizar las linea
+<Directory "/var/www/html"> y cambiarla por
+<Directory "/var/www/webmail">. 
+\end{verbatim}
+Con esto se consigue que el site principal de Apache sea donde va a estar
+situado el webmail.
+	\item Añadir un servidor virtual nuevo en el puerto 2000 y escuchando en
+la IP interna. Para ello, al final del fichero añadir lo siguiente:
+\begin{quote}
+\bfseries{
+\begin{verbatim}
+<VirtualHost 192.168.0.1:2000>
+		SSLProtocol all
+        DocumentRoot "/var/www/qmailadmin"
+        ErrorLog "/var/log/httpd/qmailadmin/error_log"
+        TransferLog "/var/log/httpd/qmailadmin/access_log"
+        ScriptAlias /cgi-bin/ /var/www/qmailadmin/cgi-bin/
+        <Directory "/var/www/qmailadmin">
+                AllowOverride None
+                Options None
+                Order allow,deny
+                Allow from all
+        </Directory>
+        ServerName 192.168.0.1
+</VirtualHost>
+\end{verbatim}
+}
+\end{quote}
+\end{itemize}
+\end{itemize}
+
+\subsection{Qmailadmin}
+
+Este CGI puede obtenerse en \emph{http://www.inter7.com/qmailadmin.html}. Esta
+utilidad permite gestionar los diferentes dominios que se han creado. La url
+para la versión disponible en el momento de escribir este documento es 
+\emph{http://www.inter7.com/qmailadmin/qmailadmin-1.0.6.tar.gz}
+
+Para
+instalarlo deben de seguir los siguientes pasos:
+
+\begin{enumerate}
+\item Descomprimir las fuentes. Cambiar al directorio donde se han
+descomprimido:
+\begin{verbatim}
+gunzip -c  qmailadmin-1.0.6.tar.gz | tar xvf -
+cd qmailadmin-1.0.6
+\end{verbatim}
+\item Configurar y compilar el programa, teniendo en cuenta las opciones que se han
+creado para Apache en el sitio de administración, es decir que el raíz del
+servicio web virtual está en /var/www/qmailadmin y que los cgi para dicho
+servicio están en /var/www/qmailadmin/cgi-bin:
+\begin{verbatim}
+./configure --enable-htmldir=/var/www/qmailadmin  \ 
+         --enable-cgibindir=/var/www/qmailadmin/cgi-bin
+make
+\end{verbatim} 
+\item Como root, instalar el programa:
+\begin{verbatim}
+make install
+\end{verbatim}
+\end{enumerate}
+
+El programa de administración podrá accederse a través de
+http://192.168.0.1/cgi-bin/qmailadmin. Para entrar basta con introducir el
+dominio y la clave que se la asignado al postmaster.
+

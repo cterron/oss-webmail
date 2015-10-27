@@ -1,0 +1,112 @@
+\section{Introducción al correo de Internet}
+
+A continuación se da una breve introducción a como funciona el correo en
+Internet, apoyandose en las RFC 2821 - la cual define el protocolo de
+transporte de correo - y la RFC 2822 - que define el formato de los
+mensajes.\footnote{En principio solo para mensajes de texto, existiendo una
+serie de extensiones llamadas MIME para otro tipo de contenido, consultar las
+RFC 2045, 2046, 2047, 2048 y  2049.}
+
+En mensaje de correo está compuesto por un sobre (envelope) 
+y un contenido.
+
+El sobre tiene un remitente (sender) y una o más direcciones de destino
+(recipients). Esta información se utiliza para rutar el correo a su destino y
+para devolver al remitente los errores.
+
+El contenido no es más que una serie de caracteres del juego US-ASCII (códigos
+del 1 al 127). Este contenido se encuentra dividio en lineas, es decir
+conjuntos de caracteres que acaban con CRLF (ASCII 13 y 10). Estas lineas se
+disponen en una cabecera (header) y un cuerpo (body),el cual es opcional.
+Estos se encuentran separados por una línea vacia.
+
+La cabecera tiene una estructura especial, con el nombre del campo, ":" y el
+contenido del mismo. No importan las mayúsculas o minúsculas en los nombres
+del campos.  El formato completo de los mismos puede encontrarse en
+la RFC 2822.
+
+Los únicos campos obligatorios de la cabecera son la fecha de origen del
+mensaje (Date:) y los campos de origen (From:)
+
+Entre los campos opcionales importantes de cara al usuario:
+\begin{itemize}
+\item Reply-To: Un a lista de direcciones separada por comas que indica a qué
+buzóni(es) (mailbox) debe de responderse.
+\item To: Los destinatarios principales del mensaje.
+\item Cc: Otros destinatarios no primarios del mensaje (del inglés carbon
+copy).
+\item Bcc: Otros destinatarios del mensajes cuyas direcciones no deben de
+revelarse (del inglés blind carbon copy).
+\item Subject: Identifica el asunto del mensaje.
+\item Message-ID: Un identificar único de mensaje.
+\end{itemize}
+
+Para el correcto rutado y para evitar bucles existen una serie de campos que
+indican por donde ha pasado el correo. Estos campos deben de ser insertados
+por el servidor SMTP cuando recibe un correo.
+
+\begin{itemize}
+\item Return-Path: Este campo indica el buzón al cual debe de mandarse un
+mensaje en caso de error. 
+\item Received: Campo de traza. Sirve para detectar por donde se ha rutado el
+correo, bucles o conexiones lentas. Es un campo de depuración, pero importante
+para la correcta gestión de correo.
+\end{itemize}
+
+\subsection{Direcciones}
+
+Una dirección de internet es una cadena de caracteres que contiene el signo @.
+La parte a la derecha del mismo se denomina parte de dominio. La parte a la
+izquierda se denomina parte local. Como excepción, existe la dirección que es
+una cadena vacia.
+
+La parte del dominio se identifica un MAIL EXCHANGER (MX) o un host que puede
+recibir correo y que debe resolverse a través de DNS. Puede indicarse en la
+parte de dominio una dirección IP entre corchetes, e.j [192.168.1.1]. En esta
+parte no se distinguen entre mayúsculas y minúsculas.
+
+La parte local se interpreta según el dominio al que pertenezca. Normalmente
+hace referencia a un buzón en el mismo.
+
+\subsection{Protocolo SMTP}
+El protocolo SMTP es el encargado de transferir el correo entre diferentes
+puntos de una manera eficiente y rápida. Normalmente usa como transporte una
+comunicación TCP. El puerto por defecto donde escuchan los servidores es el
+25.
+
+En el modelo SMTP tenemos un cliente SMTP y un servidor SMTP. El cliente
+determina a qué servidor debe de mandar el correo de que dispone - puede ser
+el servidor final o bien un servidor que le haga de pasarela -.  
+
+Una vez establecida la conexión inicial y negociado la capacidades del
+servidor, se produce una o más transaciones de correo. Estas transaciones
+siguen un modelo de enviar un comando y esperar una respuesta \footnote{A
+menos que se use la extesión PIPELINING, RFC 2920}, lo cual lo hace
+problematico sobre enlaces que tenga una alta latencia.
+
+Los comandos SMTP esperan una respuesta, donde los 3 primeros caracteres son
+números, que indican si la acción especificada se ha llevado a cabo con éxito
+o no.
+
+A continuación se presenta un pequeño esquema de los comandos que aparecen en
+una transacción de correo.
+
+\begin{enumerate}
+\item Conexión y negociación de extensiones. La conexión comienza hacia el
+puerto 25 del servidor, se espera una respuesta positiva (220) puede negociase
+las extensiones. Normalmente esto se hace a través del comando EHLO. En caso
+de que no esté implementado, pasa a usar HELO.
+\item Identificación del remitente. El comando MAIL FROM: es el encargado de
+pasar al servidor el remitente del sobre.
+\item Identificación de los destinatarios. El comando encargado es RCPT TO:.
+\item Envio de los datos de correo. Esto se hace con DATA. A continuación se
+van mandando las diferntes lineas que componen el mensaje hasta el final que
+se marca con CRLF.CRLF
+\item Finalizar la transación con QUIT o bien iniciar un nuevo envio desde el
+punto 2
+\end{enumerate}
+
+En medio de este pequeño esquema pueden producirse errores, se puede resetear
+la comunicación o puede hacerse otro tipo de consultas que no lleve al envio
+de correo. Para tener una visión completa debe de consultarse la
+RFC 2821.

@@ -1,0 +1,105 @@
+\section {Caché de DNS}
+
+Se va a usar un caché de DNS para acelerar las consultas a DNS. El software
+elegido es el djbdns. Debe de ternerse instalada las deamontools para poder 
+ejecutar correctamente este software.
+
+\subsection{Instalación}
+
+La página principal del Djbdns es \emph{http://cr.yp.to/djbdns.html}. 
+El software puede bajarse de la siguiente dirección:\newline
+\emph{http://cr.yp.to/djbdns/djbdns-1.05.tar.gz}. Para instalar
+este software deben de seguirse los siguientes pasos:
+\begin{enumerate}
+\item Descomprimir el fichero: 
+	\begin{quote}
+\begin{verbatim}
+gunzip -c djbdns-1.05.tar.gz | tar xvf -
+\end{verbatim}
+	\end{quote}
+\item Ejecutar la siguiente orden para compilar el programa:
+	\begin{quote}
+	\begin{verbatim}
+make
+\end{verbatim}	
+	\end{quote}
+\item Como superusuario ejecutar la siguiente orden para instalar el programa
+(por defecto se instala en \emph{/usr/local}.
+	\begin{quote}
+\begin{verbatim}	
+make setup check
+\end{verbatim}
+\end{quote}
+\item Crear el directorio \emph{/etc/dnscache} 
+	\begin{quote}
+\begin{verbatim}
+mkdir -p /etc/dnscache
+\end{verbatim}
+	\end{quote}
+\item Añadir los usuarios \emph{dnscache} y \emph{dnslog}. Para ello ejecutar
+las siguientes órdenes:
+\begin{quote}
+\begin{verbatim}
+useradd dnscache
+useradd dnslog
+\end{verbatim}
+\end{quote}
+\item Ejecutar la siguiente orden para generar los ficheros de configuración
+del caché de DNS:
+\begin{quote}
+\begin{verbatim}
+dnscache-conf dnscache dnslog /etc/dnscache
+\end{verbatim}
+\end{quote}
+\item Crear el directorio \emph{/var/log/dnslog} y cambiarle el propietario al
+usuario \emph{dnslog}. Para ello deben de ejecutarse las siguientes ordenes
+(como root):
+	\begin{quote}
+\begin{verbatim}
+mkdir -p /var/log/dnslog
+chown dnslog /var/log/dnslog
+\end{verbatim}
+	\end{quote}
+\item Cambiar el sitio donde almacena los logs el caché. Para ello debe de
+cambiarse el script \emph{/etc/dnscache/log/run} al siguiente:
+\begin{verbatim}
+#!/bin/sh
+MAXLOGSIZE=1048576
+NUMLOG=7
+exec setuidgid dnslog ssize $MAXLOGSIZE nnum $NUMLOG multilog t /var/log/dnscache
+\end{verbatim}
+\item Crear los enlaces simbólicos en el directorio \emph{/service}. 
+\begin{quote}
+\begin{verbatim}
+	ln -s /etc/dnscache /service/dnscache
+\end{verbatim}
+\end{quote}
+\item Cambiar el fichero \emph{/etc/resolv.conf} de tal manera que solo quede
+la linea:
+\begin{quote}
+\begin{verbatim}
+nameserver 127.0.0.1
+\end{verbatim}
+\end{quote}
+\item Comprobar el correcto funcinamiento del caché. Para ello resolver
+algunos nombres con dnsip:
+\begin{quote}
+\begin{verbatim}
+dnsip www.slashdot.org
+dnsip www.barrapunto.com	
+\end{verbatim}
+\end{quote}
+En caso de que exista algún problema pueden consultarse los logs que está
+generando el caché en \emph{/var/log/dnscache/current}\footnote{En el apendice
+XXX se hace referencia a este formato de logs}
+\end{enumerate}
+
+Es importante para el correcto funcionamiento del caché que en el PATH de
+búsqueda del sistema esté incluido el directorio \emph{/usr/local}. En caso de
+que no sea así siempre se puede editar los ficheros \emph{/etc/dnscache/run} y
+\emph{/etc/dnscache/log/run} para usar caminos absolutos hacia los
+ejecutables.
+
+Debe de mirarse la sección del texto que explican el funcionamiento de las
+daemontools para usarlas correctamente y comprender exactamente el proceso de
+arranque de los servicios que las usan.

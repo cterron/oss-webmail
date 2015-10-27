@@ -1,0 +1,193 @@
+\section{Administración del sistema}
+
+En esta sección  se abordan  los diferentes aspectos de la gestión de los
+diversos aspectos del sistema. Todas estas operaciones se van a hacer desde la
+linea de comandos y como usuario \emph{root}. Las utilidades de vpopmail se
+encuentran situadas en \emph{/home/vpopmail/bin}, directorio que normalmente
+no se encuentra en los caminos de búsqueda del sistema. Debe de hacerse explicitamente
+referencia al camino completo hasta el fichero (es decir, cuando se habla de
+vadduser, es /home/vpopmail/bin/vadduser). Por cuestiones de brevedad, en los
+siguientes apartados se omitirá el caminio completo. 
+
+\subsection{Gestión de dominios}
+\begin{itemize}
+\item \textbf{Añadir dominio}. Debe de ternerse el nombre del dominio y una
+clave para el usuario \emph{postmaster} (este debe de existir en todo dominio,
+y él le llegaran los mails erroneos). Además debe de darse de alta en el DNS
+el registro MX adecuado apuntado a la IP externa de nuestro sistema. Para
+añadir un dominio se usará la orden \emph{vadddomain}. La sintaxis es la
+siguiente:
+\begin{verbatim}
+vadddomain dominio clavepostmaster
+vadddomain dominio
+\end{verbatim}
+En el segundo caso, el programa preguntará por la clave que se le quiere
+asignar al postmaster (dos veces). Por ejemplo para crear el dominio
+dominio.com
+\begin{verbatim}
+vadddomain dominio.com
+Please enter password for postmaster:
+enter password again:
+\end{verbatim}
+\item \textbf{Borrar un dominio}. Se usa la orden \emph{vdeldomain}. Tener
+en cuanta que se borrará el dominio completo existan o no usuarios en el
+mismo. Por ejemplo, para borrar dominio.com:
+\begin{verbatim}
+vdeldomain dominio.com 
+\end{verbatim}
+\item \textbf{Añadir un alias}. Permite añadir un nuevo nombre a un dominio,
+es decir, si tenemos el dominio dom1, podemos añadir uno nuevo, dom2, de tal
+manera que sean el mismo. Por ejemplo, queremos que dominio.es apunte a
+dominio.com:
+\begin{verbatim}
+vaddaliasdomain dominio.es dominio.com
+\end{verbatim}
+\end{itemize}
+
+\subsection{Gestión de usuarios}
+\begin{itemize}
+\item \textbf{Añadir un usuario}. Se usa la orden \emph{vadduser}. Necesitamos
+conocer la password y la direccion de correo que queremos.Por ejemplo, para
+añadir usuario@dominio.com con password "clave":
+\begin{verbatim}
+vadduser usuario@dominio.com clave
+\end{verbatim}
+En caso de no especificar la clave, el sistema nos pedirá que se introduzca
+una. 
+
+Opcionalmente se puede especificar un comentario con el parámetro $-c$. Es 
+útil para incluir el nombre del usuario. Ejemplo, crear el usuario llamado
+Usuario de administración con dirección adm@dominio.com:
+\begin{verbatim}
+vadduser -c "Usuario de administracion" adm@dominio.com
+\end{verbatim}
+\item \textbf{Borrar un usuario}. Se usa la orden \emph{vdeluser}. Por
+ejemplo, para borrar usuario@dominio.com:
+\begin{verbatim}
+vdeluser usuario@dominio.com
+\end{verbatim}
+\item \textbf{Obtener la información sobre un usuario}. La orden encargada
+de ello es \emph{vuserinfo}. Ejemplo, si se quiere obtener información de
+adm@dominio.com:
+\begin{verbatim}
+vuserinfo adm@dominio.com
+\end{verbatim}
+La salida obtenida es similar a:
+\begin{verbatim}
+name:   adm
+passwd: $1$3z8Ws$5K.AcVNxoPPik7mj8NgFs.
+clear passwd: uio
+uid:    0
+gid:    0
+        all services available
+dir:       /home/vpopmail/domains/dominio.com/adm
+quota:     NOQUOTA
+usage:     NOQUOTA
+\end{verbatim}
+\item \textbf{Cambiar la clave de un usuario}. La orden que se usa es
+\emph{vpasswd}. Ejemplo, si se quiere cambiar la password de adm@dominio.com
+por "nuevapassword":
+\begin{verbatim}
+vpasswd adm@dominio.com nuevapassword
+\end{verbatim}
+En caso de omitir el campo con la nueva clave, el programa preguntará por la
+misma y pedirá posteriormente confirmación.
+\end{itemize}
+
+\subsection{Herramientas gráficas de administración}
+
+Las herramientas descritas en las dos secciones anteriores, permiten el uso de
+scripts para la gestión. Sin embargo, para dotar de un poco de comodidad al
+sistema, se ha incluido una gestión web con ayuda de QmailAdmin. Con ayuda de
+la misma pueden gestionarse las cuentas de cada uno de los dominios.
+
+El único inconveniente que tiene es que hay que hacer la gestión dominio a
+dominio, entrando en el  mismo por cada uno del que se quiere gestionar. 
+
+En la configuración propuesta a esta herramienta se accede a través de la url
+\emph{http://192.168.0.1/cgi-bin/qmailadmin}. En principio usa su propia
+autentificación, basada en la uenta de postmaster del dominio a gestionar.
+Puesto que no se ha montado esta web de administración con SSL y loas
+contraseñas viajan en texto claro, hay que usarla bien localmente, bien en una
+red desde la que se confíe. En otro caso sería conveniente montarla sobre SSL.
+
+Para entrar a gestionar un dominio se presenta la siguiente pantalla
+
+\includegraphics{login-qmailadmin}
+
+Una vez introducido el dominio y la contraseña de la cuenta \emph{postmaster}
+se nos presneta el siguiente menú:
+
+\includegraphics{main-menu}
+
+La descripción del las opciones:
+\begin{itemize}
+\item \emph{Cuentas POP:} Toda la gestión de cuentas: añadir usuarios,
+modificar o borrar. Cambiar las diferentes propiedades de la cuenta como
+nombre del usuario, clave o subscribirlo a una lista de correo.
+\item \emph{Alias reenvios:} Permite definir alias a una cuenta de correo.
+\item \emph{Autoresponderes:} Permite definir respuestas automáticas, aunque
+es algo a evitar en lo posible, en especial si los usuarios estan subcristos a
+listas de correo, puesto que son muy molestos (vacation y similares).
+\item \emph{Listas de correo:} Permite la gestión de listas de correo.
+\end{itemize}
+Existen una serie de enlaces rápidos a la creación de nuevas cuentas de
+correo, alias, autoresponder y listas.
+
+Al pulsar sobre el enlace \emph{Nuevas cuentas POP}, pasando a la siguiente
+pantalla:
+
+\includegraphics{nueva-cuenta}
+\newline
+En ella se introduce el nombre de la cuenta que quiere crearse, la contraseña
+de la misma y el nombre del usuario - campo gecos -.  Aparece un listado de
+las listas de correo, donde puede seleccionarse aquellas para las que el
+usuario deba de estar suscrito.
+
+
+Si se quiere modificar las propiedades de los usuario se pulsa sobre
+\emph{Cuentas POP}, pasando a la siguiente pantalla:
+
+\includegraphics{admin-cuentas}
+
+Desde esta pantalla se puede:
+\begin{itemize}
+\item Borrar una cuenta: para ello se pulsa sobre el botón situado en la
+columna borrar de la cuenta en cuestión, presentandose una pantalla de
+confirmación.
+\item Modificar una cuenta: para ello se pulsa en el botón situado en la
+columna modificar. Un poco más adelante puede verse la pantalla. Desde ella
+puede modificarse las claves del usuario, activar el autoresponder - pudiendo
+especificarse el mensaje -. El único problema que presenta esta herramienta es
+que hay que modificar también la contraseña para que se almacenen los cambios.
+\item Habilitar la opción de que todos los correos no definidos sean borrado.
+Esto se activa al pulsar \emph{Habilitar borrado de todos los mensajes de
+cuentas no definidas}.
+\item Habilitar una cuenta como  \emph{recoge correos}. La cuenta elegida
+recibirá todos los correos rebotados. Esta cuenta se selecciona pulsando
+sobre \emph{Coger todas las cuentas}. Este comportamiento puede deshabilitarse
+pulsando sobre \emph{Devolver al remintente todos los correos no definidos}.
+\includegraphics{modificar-cuenta}
+\end{itemize}
+
+Para gestionar los alias y reenvios se usa el enlace \emph{Alias reenvio}.
+\begin{itemize}
+\item Alias. Para añadir un alias se pulsa sobre el enlace \emph{Añadir nuevo
+alias}. Se presenta una lista desplegable, donde se elige la cuenta a la cual
+va a añadirse el alias. Posteriormente se escribe el alias que queremos usar.
+También pueden borrarse o modificarse dichos alias.
+\item Reenvios. Un reenvio pasa el correo que reciba la cuenta del dominio que
+se administra hacia una cuenta especificada. Se añaden usando la opción
+\emph{Añadir nuevo reenvio}
+\end{itemize}
+
+
+El enlace \emph{Listas de correo} del menu principal permite la gestión de las
+mismas. El menu que se muestra es el siguiente:
+
+\includegraphics{admin-listas}
+
+Se puede añadir, borrar y ver los subscritores que tienen una lista. Para ello
+basta con pulsar sobre el botón en la columna deseada. Existe un botón que
+permite borrar toda la lista de correos y un enlace que nos permite crear una
+nueva.

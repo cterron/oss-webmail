@@ -1,0 +1,56 @@
+\section{Vpopmail}
+
+Vpopmail es un software que permite la gestión de dominios virtuales. Este
+software va a usar MySQL como almacén de datos. 
+
+\subsection{Instalación}
+
+Excepto la descompresión de las fuentes, todo el proceso de instalación de
+este componente de software debe de hacerse como root. El programa puede
+bajarse desde \emph{http://vpopmail.sf.net}\footnote{La última versión estable
+es la 5.4.0}
+
+\begin{enumerate}
+\item Bajar las fuentes de vpopmail. 
+\item Descomprimir las fuentes.
+\begin{verbatim}
+gunzip -c vpopmail-5.4.0.tar.gz | tar xvf -
+\end{verbatim}
+\item Crear el usuario y grupo necesario para el funcionamiento del vpopmail:
+\begin{verbatim}
+groupadd vchkpw
+# Para el caso de Redhat
+useradd -M -s /sbin/nologin  -g vchkpw vpopmail
+# Para el caso de Debian
+useradd -M -s /bin/false -g vchkpw vpopmail
+\end{verbatim}
+\item Configurar, compilar e instalar el vpopmail con soporte para MySQL. Esta
+orden instalará por defecto en /home/vpopmail
+\begin{verbatim}
+./configure --enable-auth-module=mysql
+make
+make install
+\end{verbatim}
+\item Configurar el acceso a la base de datos (login, password y base de
+datos) en el fichero \emph{/home/vpopmail/etc/vpopmail.mysql}
+\begin{verbatim}
+localhost|0|vuser|vclave|vdatabase
+\end{verbatim}
+Donde \emph{vuser} es el usuario para acceder a la base de datos,
+\emph{vclave} es la clave de dicho usuario y \emph{vdatabase} es la base de
+datos que se va a usar.
+\end{enumerate}
+
+Tras seguir este proceso, el vpopmail quedará instalado en
+\emph{/home/vpopmail}. La estructura de directorios que queda es:
+
+\begin{tabular}{|l|l|}
+\hline
+/home/vpopmail/bin & Programas ejecutables \\
+/home/vpopmail/doc & Documentación \\
+/home/vpopmail/domains & Almacen de correo \\
+/home/vpopmail/etc & Ficheros de configuracion \\
+/home/vpopmail/include & Includes para desarrolo \\
+/home/vpopmail/lib & Librerias para desarrollo \\
+\hline
+\end{tabular}

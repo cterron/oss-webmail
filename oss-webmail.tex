@@ -1,0 +1,541 @@
+\documentclass[a4paper,12pt]{article}
+%\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage[latin1]{inputenc}
+\usepackage{graphicx}
+\usepackage{color}
+\newcounter{chapter} % Esto es para un puto bug del latex!
+%\usepackage{listings}
+\title{Un sistema de gestión de correo con software de fuentes abiertas}
+\author{
+	Carlos Terrón
+	carlos.terron@gmail.com
+}
+
+
+\date{16 de Noviembre 2002}
+\begin{document}
+\maketitle
+\newpage
+\tableofcontents 
+\newpage
+\section{Objetivos}
+
+Se trata de implementar un sistema de correo completo usando software de
+fuentes abiertas. Se  busca:
+\begin{itemize}
+\item Gestionar correo para varios dominios. 
+\item Servir POP3 a varios dominios.
+\item Servir correo IMAP a varios dominios.
+\item Webmail.
+\item Utilidad de administración sencilla, a ser posible por web.
+\item Sistema veloz, seguro y escalable.
+\end{itemize}
+
+El corazón de todo el sistema es el software que se ocupa de la gestión de
+correo. Es conocido como MTA (\emph{Mail Transport agent}). Es el encargado de
+recibir el correo, repartirlo en los buzones para aquellos dominios que
+gestiona, enviar el correo que recibe de aquellos clientes SMTP autorizados.
+
+El correo que se almacena localmente debe de estar disponible a través de IMAP
+(\emph{Internet Message Access Protocol}) y de POP3 (\emph{Post office protocol
+version 3}). Es crucial que el almacenamiento local de correo sea
+\emph{seguro} y que no se produzca problemas por acceso múltiples entre el MTA
+y los programas que gestionan el IMAP y POP. 
+
+Se quiere que  el correo esté accesible a través de un webmail,
+se necesitará instalar un servidor de web. Para garantizar la seguridad de las
+comunicaciones este webmail debe de usar   SSL (\emph{Secure
+Socket Layer}). 
+
+Tradicionalmente en los sistemas Unix, los datos de los
+usuarios\footnote{nombre de la cuenta, clave, descripción} están en el
+fichero /etc/passwd. Sin embargo, esto no es práctico para el sistemas de
+correo con muchos usuarios y varios dominios: no puede tenerse dos usuarios
+con el mismo nombre y se obliga a tener una cuenta local para cada uno.
+Aparte, la búsqueda en ficheros planos de texto es muy lenta.
+La solución a estos problemas es usar una base de datos SQL.
+Otra posible solución que puede estudiarse es usar  un sistema
+de directorio tipo LDAP.
+
+ Actualmente la mayoría de los sistemas Unix tienen
+un mecanismo, denominado PAM (pluggable authentication module) que permite el
+uso de otros sistemas de autentificación distinto al fichero de passwd, 
+pero manteniendo las tradicionales interfaces de Unix de programación.
+
+
+\section{La solución}
+\subsection{El sistema operativo}
+
+El sistema operativo tipo Unix es necesario para implementar esta solución.
+Tenemos varias alternativas, tanto de fuentes abiertas (Linux, FreeBSD,
+NetBSD, OpenBSD) como cerradas (Solaris, Aix). El sistema elegido es Linux: es
+de fuentes abiertas, tiene un buen rendimiento y buen soporte de hardware.
+Como distribución de Linux, se usará una \emph{Fedora Core 1 y Debian Woody}. Con ligeras modificaciones, lo que se comenta aquí es aplicable a otras distribuciones Linux (Mandrake, Conectiva, Gentoo).
+
+Debe de comprobarse que el hardware donde se va a instalar el equipo es
+compatible con la distribución de sistema elegida. En este documento se
+supone una instalación básica del sistema junto con las herramientas de
+desarrollo necesarias para poder compilar. También se supone que están
+actualizados los paquetes de la distribución adecuadamente con todas las
+erratas publicadas corregidas.
+
+Hacer notar que se van a usar los paquetes estandar de las distintas
+distribuciones excepto el sistema de correo, el cual se compilará e instalará
+manualemente.
+
+\subsection{El MTA}
+
+Dentro del mundo Unix los principales MTA que se usan son \emph{sendmail,
+postfix,  y qmail}.
+
+\begin{itemize}
+\item \emph{sendmail} Sendmail, es un clásico MTA, que viene de todos los
+Unix, tanto comerciales como libres. Es bastante rápido sacando correo. En
+contra tienen un mal historial de seguridad, un fichero de configuración
+críptico y una arquitectura monolítica. Puede encontrarse en
+\emph{http://www.sendmail.org}.
+\item \emph{postfix} Postfix que nace como sustituto del sendmail. Presenta
+una arquitectura modular (varios programas que se comunican entre ellos),
+intenta ser seguro, rápido y eficiente. De puertas afuera, intenta parecerse
+a sendmail en todo lo posible. Puede encontrarse en\newline
+\emph{http://www.postfix.org}.
+\item \emph{qmail} Al igual que postfix, parte de una arquitectura modular,
+con un conjunto de programas que se comunicacan entre sí. Busca ser rápido,
+eficiente y seguro. Presenta una particular manera de almacenar el correo, los
+Maildir, que permiten huir de los mbox que presentan problemas de corrupción.
+El único pero que puede ponerse es que no tiene un desarrollo continuo como
+postfix o sendmail. 
+Puede encontrarse en \emph{http://cr.yp.to/qmail.html}.
+\end{itemize}
+
+A sendmail le falta modularidad, su configuración es complicada y el uso de
+un formato de buzón no es interante para este proyecto. Respecto a postfix,
+integra muchas de las cosas que en qmail hay que hacer a través de parches.
+Sin embargo la simplicidad de qmail y su velocidad, así como una base de
+código más pequeña le hace más sencillo su uso.
+
+La elección de qmail como MTA condiciona el resto del software que se va a
+usar en esta implementación, puesto que para aumentar su eficiencia. Este
+software es:
+\begin{itemize}
+\item \emph{Daemontools}: conjunto de programas, que sustituye a los
+tradicionales arranque de Unix desde el proceso init o bien desde los
+directorios en /etc/rc. Puede encontrarse en http://cr.yp.to/daemontools.html.
+\item \emph{ucspi-tcp}: conjunto de programas, que implementan funcionalidades
+parecidas a inetd: escuchar en determinados puertos y lanzar procesos
+conectados con ellos. Puede encontrarse en http://cr.yp.to/ucspi-tcp.html.
+\end{itemize}
+
+
+Para apoyar el uso de dominios virtuales y no tener usuarios locales vamos a
+ usar un software (que también puede usarse con postfix) llamado vpopmail.
+Este puede encontrarse en http://inter7.com/vpopmail. Este software también nos
+permite interactuar con LDAP en caso de que queramos tener a los usuarios en
+un servicio de directorio. Este programa va a ser el que se ejecute y acceda a
+base de datos para comprobar los usuarios.
+\subsection{Servidor de POP3 e IMAP}
+Como servidor de POP3 e IMAP se usará Courier - a pesar de que qmail trae un
+servidor de pop3 propio -. Se aprovechará los módulos de autentificación de
+Courier que permiten usar vpopmail - el software que se usa para gestionar
+dominios virtuales - para realizar la autentificación. El Courier IMAP puede
+bajarse de \emph{http://www.inter7.com/courierimap}.
+
+
+\subsection{Servidor de base de datos}
+
+A la hora de manejar los datos de los usuarios de manera eficiente, vamos a
+usar una base de datos SQL. Esta base de datos dará soporte a las diferentes
+partes del sistema.
+
+Dentro del mundo de fuentes abiertas nos encontramos con dos soluciones de
+base de datos muy usadas
+
+\begin{itemize}
+\item \emph{MySQL (http://www.mysql.org)}. Es una popular base de datos, muy
+usada en sitios web. Su mejor característica es la velocidad. Sin embargo, se
+han sacrificado por esto muchas características que son importantes en una
+base de datos: no soporta transacciones, los bloqueos son a nivel de tabla, no
+tiene procedimientos almacenados, vistas, o sigue de cerca el estandar ANSI.
+Al menos en la versión 3.x que es la más utilizada.
+
+\item \emph{Postgresql (http://www.postgresql.org)}. Una base de datos que
+orientada a objetos descendiente de los proyectos INGRES y POSGRES
+desarrollados en Berkeley. Tienes muchas de las características que le faltan
+a MySQL, pero sin embargo no es tan rápida como ésta. También su manejo es más
+complicado que MySQL.
+\end{itemize}
+
+Los programas que se van  a usar para implementar el sistema de correo soportan
+ambas bases de datos. A costa de algo de velocidad, postgresql es una base de
+datos más robusta que MySQL. Sin embargo, lo único que se necesita en el
+proyecto es una base de datos capaz de almacenar tablas planas. Además, el
+soporte de vpopmail\emph{software con el que se gestionará los dominios
+virtuales} de MySQL está más maduro que postgresql, con lo cual se usará MySQL
+para dar soporte a vpopmail.
+
+
+\subsection{Servidor de Web}
+
+El servidor de web va a permitir implementar dos funciones:
+
+\begin{itemize}
+\item Una interfaz de administración, con lo cual cualquiera con los permisos
+adecuados puede gestionar todo nuestro sistema de correo. Esto lo vamos a
+conseguir con la ayuda de un CGI llamado qmailadmin
+(\emph{http://www.inter7.com/qmailadmin/})
+\item Implementar un  webmail: un sistema que permite enviar y recibir correo
+a través de un navegador web.
+\end{itemize}
+
+Dentro del mundo de fuentes abiertas el servidor Web por escelencia es Apache
+(\emph{http://www.apache.org}). Es un programa altamente flexible, potente y
+rápido. Permite servir contenido estático, ejecutar CGIs, páginas dinámicas en
+diversos lenguajes (gracias a la cantidad de módulos que trae).
+
+Por último se necesita el módulo de apache \emph{mod\_ssl} el cual permite
+soporte de SSL en las conexiones. Con él se conseguirá que las comunicaciones
+con el webmail y la parte de administración sean encriptadas.
+
+
+
+\subsection{Software auxiliar}
+
+\subsubsection{Cache de DNS}
+
+Es un servidor DNS con la particularidad de que, cuando no conoce como dar
+servicio a una petición, la realiza, y la almacena en memoria, teníendola
+disponible durante un cierto tiempo. La idea es no tener que efectuar
+peticiones a internet continuamente y que enlentezca el proceso. Las entradas
+se van descartando de la memoria por edad (o en caso de que se llene la
+cantidad de memoria asignada a almacén).
+
+Tenemos varias opciones, entre las que destacan:
+\begin{itemize}
+\item \textbf{BIND} \emph{http://www.isc.org/products/BIND/}. Es una
+implementación de los protocolos DNS, que se inició en Berkeley. Actualmente
+en su versión 9, aunque tanto las versiones 4 y 8 siguen usandose mucho. Es el
+software más usado como servidor de DNS. Sin embargo se ha visto afectado por
+diferentes problemas de seguridad en sus diferentes versiones. El uso como
+caché (en especial en las versiones 4 y 8) presenta problemas debido a que no
+se puede poner límite al tamaño de las peticiones, y además descarta las
+nuevas entradas en la caché en vez de las viejas cuando empieza a tener
+problemas de memoria.
+\item \textbf{Djbdns} \emph{http://cr.yp.to/djbdns.html}. Del mismo autor que
+qmail, es un conjunto de programas que implementan los protocolos DNS.Uno de
+ellos es   \emph{dnscache}, el cual permitirá facilmente implementar la caché
+DNS.
+\end{itemize}
+
+Por seguridad y facilidad de configuración, en este proyecto se usará el
+djbdns. Además se integra perfectamente con las herramientas que vamos a usar
+con qmail.
+
+\section{Configuración del sistema operativo}
+
+La tarea de configurar el sistema debe de hacerse con todo cuidado. Debe de
+instalarse con aquello que necesitemos exclusivamente,
+asegurándonos que esté a último nivel de parches, en especial de aquellos que
+afectan a la seguridad.
+
+Las distribuciones pueden obtenerse de \emph{http://fedora.redhat.com/} para
+el caso de Fedorra y de \emph{http://www.debian.org} para el caso de Debian.
+Es conveniente usar el mirror más cercano para bajarsela.
+
+
+En este documento no se va a explicar los pasos para instalar las
+distribuciones Linux elejidas. Puede consultarse los manuales de instalación 
+de Fedora en \emph{http://fedora.redhat.com/docs/}\footnote{Actualmente hay
+muy poca documentación sobre la Fedora. Puede mirarse sin embargo la de la
+Redhat 9 en  http://www.redhat.com/docs/manuals/linux/RHL-9-Manual/}. Para la
+Debian los manuales de instalación se encuentran en
+http://www.debian.org/releases/stable/installmanual.
+
+
+\subsection{Algunas notas de la instalación}
+
+En esta sección se va a tratar de varios aspectos a tener en cuenta en la
+instalación.
+\begin{itemize}
+\item \textbf{Hardware soportado}. Debe de comprobarse que el hardware que va
+a usarse está soportado por la distribución. 
+\item \textbf{Tamaño de particiones}. Sin contar el espacio necesario para el
+sistema, en caso de que se decida tener varias particiones, debemos de prestar
+especial atencion a donde vayan a ir situados los directorios \emph{/var} y
+\emph{/home}. Bajo el primero va a ir situado la cola de correo y toda la
+gestión la información de actividades del sistema (logs). En el segundo
+directorio estarán situados los buzones de correo. Si se busca redundancia
+lo ideal es que estas dos particiones estén situadas en RAID 5 (aunque para
+crear un RAID 5  se necesitan al menos 3 discos). También si se busca la máxima
+concurrencia es interesante disponer las particiones en diferentes discos.
+En especial hay  que tener en cuenta el tamaño asignado a \emph{/home}, puesto
+que es donde se van a almacenar los buzones de correo.
+\item \textbf{Parches de seguridad}. Desde que se publicaron las
+distribuciones han surgido problemas de seguridad que se han ido corrigiendo a
+través de diversos parches. Deben de actualizarse los programas instalados que
+hayan tenido problemas. Las actualizaciones de Fedora pueden encontrase en
+http://fedora.redhat.com/download/updates.html, mientras que para Debian
+pueden buscarse en http://www.debian.org/security/. Ambas distribuciones
+tienen herramientas que permiten la actualización automática.
+\item \textbf{Usuarios}. Al ser una máquina destinada a servidor, los usuarios
+que tengan acceso a ellas deben ser los mínimos. Deben de elegirse las claves
+\textbf{robustas y complejas}. No conviene trabajar como root\footnote{Usuario
+de administración} nada más que lo necesario, con lo cual se debe de crear
+otro usuario para poder manejar la máquina (y en caso de necesitar root usar
+su).
+\item \textbf{Interfaces de red}. Es ideal contar con dos interfaces de red.
+Esto nos permite tener una interfaz conectada a Internet y otra de
+administración.
+\end{itemize}
+\subsection{Software que debe de instalarse}
+
+Ha continuación se detalla una lista de paquetes que vienen con la
+distribución y que deben de ser instalados, bien de los CDROM originales o
+bien de las actualizaciones. Es \textbf{importante} comprobar estas últimas.
+\begin{itemize}
+\item \textbf{Apache}. Servidor web.
+\item \textbf{OpenSSL}. Librerias criptográficas. 
+\item \textbf{Soporte SSL Apache}. 
+\item \textbf{OpenSSH}. Secure Shell. Permite acceder remotamente a la máquina a través
+de un canal cifrado. 
+\item \textbf{MySQL}. Base de datos.
+\item \textbf{Software de desarrollo}. Este software solo lo necesitamos para
+compilar las cosas.
+\end{itemize}
+\subsection{Asegurando el sistema}
+
+Esta sección se describe los pasos necesarios para asegurar el sistema base y
+dejar sólo lo imprescindible para dar el servicio adecuado.
+\subsubsection{Parar servicios innecesarios}
+
+En los sistemas Linux, hay varias maneras de arrancar servicios\footnote{Y no
+siempre es igual en todas las distribuciones.}.En primer lugar desde los
+scripts del sistema de arranque, desde los  \emph{super daemons, como xinetd o
+inetd}, o desde scripts propios. 
+
+
+ Las distribuciones elegidas usan el
+llamado sistema de arranque de \emph{System V}. En este modelo, existe un
+proceso llamado \emph{init}, el cual es el padre de todos los procesos, y cuya
+configuración está  almacenada en \emph{/etc/inittab}.
+En dicho fichero se define los \emph{runlevels}, que no son más que una
+configuración que permite la existencia de un conjunto determinado de
+procesos.
+ Para ver los servicios que se arrancan en
+un nivel determinado:
+\begin{itemize}
+\item En Fedora:
+\begin{verbatim}
+	/usr/sbin/ntsysv
+\end{verbatim}
+\item En Debian:
+\begin{verbatim}
+	/usr/bin/rcconf
+\end{verbatim}	
+\end{itemize}.
+
+Debe de repasarse la configuración de xinetd o de inetd - en función del
+super daemon que se use. Para el primero, los ficheros de configuración están
+en \emph{/etc/xinetd.d/} mientras que para el segundo el fichero es
+\emph{/etc/inetd.conf}
+
+Es importate saber si hay servicios a la espera de conexiones de Internet.
+Para ello podemos usar el comando \emph{/usr/sbin/lsof -i -n} 
+
+\subsubsection{Revisar los usuarios}
+
+Debemos de revisar la existencia de usuarios que acceden al sistema. En
+principio, si la instalación es limpia, no existirán más que los usuarios
+creados por ésta. En caso de no ser así debemos de repasar el fichero
+\emph{/etc/passwd} viendo los usuarios creados después de la instalación.
+Podemos usar los comandos \emph{/usr/sbin/userdel} para quitar los usuarios
+que no necesitemos. Tened precaución con los usuarios que se borran, puesto
+que hay una serie de ellos que son del sistema y necesarios para su
+funcionamiento (normalmente estos usuarios son los que tienen en el segundo
+campo del fichero /etc/shadow con !!)\footnote{Este fichero sólo puede verse 
+estando como root. Mirar formato en apéndice XXX}.
+
+Hay que comprobar también que no existan cuentas sin contraseña y que la
+robustez de las contraseñas usadas es adecuada. En el primero caso hay que 
+repasar que el segundo campo del fichero /etc/shadow no esté vacio. En el
+segundo hay que  asegurarse que el sistema de password que está en uso es md5.
+Para ello el segundo campo de las cuentas debe de comenzar por \$1\$. Ojo, las
+cuyo campo de password es  !! están correctas. Simplemente son cuentas que no
+pueden usarse para hacer login en el sistema.
+
+Por último puede comprobarse la robustez de las contraseñas con ayuda de un
+programa con el \emph{John} el cual puede localizarse en
+http://www.openwall.com/john/
+
+Normalmente, se crea una cuenta para la administración del correo. Esta cuenta
+recibirá los correos rebotados, los dirigidos al usuario root (Qmail nunca
+entrega correo al root de la máquina), y aquellos alias especiales, que se
+necesiten (como por ejemplo postmaster).
+
+Si queremos que la cuenta se llame \emph{mailadmin} debe de crearse y ponerle
+una clave con las siguientes órdenes:
+
+\begin{quote}
+	\bfseries{
+		useradd mailadmin
+		\newline
+		passwd mailadmin
+	}
+\end{quote}
+
+\subsubsection{Configurar el acceso}
+
+Si la configuración elegida es tener dos interfaces de red, una puede usarse
+para administración, y para el tráfico de correo desde dentro de una empresa,
+con la otra interfaz abierta a Internet. Para acceder remotamente a la máquina
+se va a usar OpenSSH. Normalmente a la máquina sólo debe de tener acceso
+aquellos usuarios que deban administrarla, y ello no suele ser a través de
+Internet. Lo mismo es aplicable para la interfaz web de administración, aunque
+su configuración se tratará en el apartado de Apache.
+
+Para cortar acceso al daemon de OpenSSH, llamado sshd, lo más sencillo es
+cortar el puerto 22 TCP en el firewall del kernel. Por ejemplo, si sólo se
+quiere que se acceda desde la subred 192.168.0.0/24, pues se utilizaría una
+orden como:
+
+\begin{quote}
+/sbin/iptables  -A INPUT -p tcp --dport 22  -s ! 192.168.0.0/24  -j DROP
+/etc/rc.d/init.d/iptables save
+\end{quote}
+
+La segunda orden guarda la regla añadida en los ficheros de configuración del
+sistema. 
+
+Para buscar más información sobre el filtrado en el firewall puede consultarse
+la dirección web
+\emph{http://www.iptables.org/documentation/HOWTO/es/packet-filtering-HOWTO.html}.
+
+
+\subsection{Configuración de directorios y PATH}
+
+Los programas se van a instalar en varios directorios. Para evitar tener que
+recordar largas rutas, conviene tener a los mismos  de ejecutables en la
+variable PATH del sistema.
+
+Debe de crearse un directorio donde vamos a instalar alguno de los
+programas que necesitemos. Así, los pasos a seguir:
+\begin{enumerate}
+\item Crear el directorio \textbf{/package} con las órdenes:
+	\begin{quote}
+		mkdir -p /package
+		\newline
+		chmod 1755 /package
+	\end{quote}
+\item Crear los directorios donde almacenaremos los logs de los diferentes
+daemons. Para ello deben de crearse los siguientes directorios:
+
+\begin{tabular}{|l|l|}
+\hline 
+/var/log/qmail/qmail & La información de ejecución del qmail \\
+/var/log/qmail/qmail-smtp & La información de ejecución de la
+parte de qmail encargada de la gestión de SMTP \\
+/var/log/qmail/pop3 & La información de daemon de POP3 \\
+/var/log/qmail/imap & La información del daemon de IMAP \\
+\hline
+\end{tabular}
+	
+\item Introducir en el PATH (siempre que no estén ya) del sistema los directorios \textbf{/usr/local/bin} y
+	\textbf{/var/qmail/bin}. Para ello:
+	\begin{enumerate}	
+		\item Editar el fichero \emph{/etc/profile} y al final añadir
+			  las líneas:
+				\begin{quote}
+					PATH=\$PATH:/var/qmail/bin:/usr/local/bin
+					\newline
+					export PATH
+				\end{quote}
+		\item Editar el fichero \emph{/etc/csh.login} y al final la línea:
+				\begin{quote}
+				setenv PATH "\${PATH}:/var/qmail/bin:/usr/local/bin"
+				\end{quote}
+	\end{enumerate}
+\end{enumerate}
+
+\subsection{Quitar el MTA por defecto}
+
+
+\section{Instalación de programas auxiliares}
+
+\subsection{Daemontools}
+
+La información sobre las daemontools pueden encontrarse en la página
+\emph{http://cr.yp.to/daemontools.html}.  La última versión en el momento de
+la escritura de este documento es la 0.76 y puede bajarse desde
+\emph{http://cr.yp.to/daemontools/daemontools-0.76.tar.gz}. 
+
+Para instalar seguimos los siguientes pasos:
+\begin{enumerate}
+	\item Copiar y descomprimir el fichero en el directorio \emph{/package}
+	(se descomprime con la ayuda de tar  y gunzip: gunzip -c daemontools-0.76$|$
+tar zvf -).
+	\item Irse al directorio \emph{/package/admin/daemontools-0.76}  y
+ejecutar \textbf{package/install}. 
+\end{enumerate}
+
+Con estos dos pasos debemos tener las daemontools instaladas y ejecutándose
+(fácil de comprobar con ejecutando un comando como \emph{ps -ef $|$ grep svscan}
+cuya salida debe ser similar a:
+
+\begin{quote}
+$[$terron@baldurgate$]$:admin$>$ps -ef $|$ grep svscan
+\newline
+root      1102     1  0 Dec13 ?        00:00:00 /bin/sh /command/svscanboot
+\newline
+root      1111  1102  0 Dec13 ?        00:00:00 svscan /service
+\end{quote}
+
+Ahora debe de crearse el directorio donde van a colocarse los diferentes
+scripts de arranque:
+
+\begin{quote}
+mkdir -p /service
+\newline
+chmod 1755 /service
+\end{quote}
+
+\subsubsection{Una nota sobre los ficheros de logs}
+El sistema de correo montado usa el programa multilog de las daemontools para
+escribir los logs a disco junto con una fecha del momento en el que se
+produjeron. Por defecto, el tamaño de los ficheros está limitado a 99999 bytes
+y conserva los 10 últimos. Sin embargo esto puede que no sea suficiente para
+sitios con mucho tráfico. Para ello, en los scripts que hagan uso de multilog
+se usan dos variables para poder controlar el tamaño y el numero de ficheros
+que se guardaran. Estas variables se llamaran MAXLOGSIZE y NUMLOG.
+
+
+\subsection{ucspi-tcp}
+
+La información referente a este paquete puede encontrarse en la página web
+\emph{http://cr.yp.to/ucspi-tcp.html}.  La instalación de la misma puede
+hacerse siguiendo los siguientes pasos:
+
+\begin{enumerate}
+\item Comprobar la última versión del paquete y bajar las fuentes. La última 
+versión en el momento de escritura de este documento es la 0.88. Puede bajarse
+de \emph{http://cr.yp.to/ucspi-tcp/ucspi-tcp-0.88.tar.gz}.
+\item Descomprimir y desempaquetar el archivo: gunzip -c ucspi-tcp-0.88.tar.gz
+$|$ tar xvf -
+\item Irse al directorio resultante (cd ucspi-tcp-0.88). Ejecutar \emph{make}.
+Como root, ejecutar en dicho directorio \emph{make setup check} 
+\end{enumerate}
+
+Tras estos pasos tendremos las distintas utilidades instaladas en
+\emph{/usr/local}.
+\input{djbdns}
+\input{qmail}
+%\input{postgres}
+\input{mysql}
+\input{vpopmail}
+\input{courier}
+\input{util-mail}
+\input{apache}
+\input{webmail}
+\input{administracion}
+\input{intr-smtp}
+\input{advanced}
+\end{document}

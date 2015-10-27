@@ -1,0 +1,490 @@
+\section{Qmail a fondo}
+
+En la siguiente sección se explica el funcionamiento completo de qmail, como
+usa vpopmail para facilitar el uso de los dominios virtuales. Este apartado
+está estructurado en función del flujo que sigue el correo - ya proceda de la
+red via SMTP, bien se injecte localmente en el sistema -, a través de la cola
+de correo, y de los programas que se encargan de la entrega local o remota.
+
+Todos los ficheros de configuración de los cuales se habla en los siguientes
+apartados se encuentran en \emph{/var/qmail/control}. Sino existe el fichero
+de configuración, se toma el valor por defecto que se menciona.
+
+La mayoría de la información de este apartado está obtenida de las páginas de
+manual de qmail. De hecho, la descripción de los ficheros de configuración y
+las variables de entorno son traducciones de las mismas.
+
+\subsection{Entrada de correo via SMTP}
+
+El primer elemento es el \emph{tcpserver}. Este programa se encarga de
+escuchar en el puerto tcp que se le indique. Posteriormente ejecuta el
+programa que se le indique, de tal manera que la entrada estandar (descriptor
+0 ) del mismo recibe los datos de la conexión de red y la salida estandar
+(descritor 1) los envia y asigna ciertos valores a una serie de
+variables de entorno que el programa llamado puede leer.
+
+Las conexiones pueden permitirse o rechazarse gracias a un fichero de reglas,
+además de establecer variables de entorno según nos convenga. Con ayuda de
+este mecanismo se permite el relay a aquellas direcciones que interese. El
+nombre de la variable es RELAYCLIENT.
+
+Una vez recibida la conexión tcpserver ejecuta el módulo de qmail
+\emph{qmail-smtpd}. Este programa se encarga de leer el correo a través de
+SMTP de la red e introducirlo en el sistema (esto lo hace gracias al programa
+qmail-queue). Antes de inyectar el correo en el sistema cuenta el número de
+saltos para evitar bucles (esto lo hace a través de las cabeceras Received o
+Delivered-To).
+
+
+qmail-smtpd utiliza las siguientes ficheros de configuración (situados en
+/var/qmail/control):
+
+\begin{itemize}
+\item \emph{badmailfrom}  La lista de direcciones que aparezcan en este fichero son
+rechazados.  Si aparece una linea de tipo @host, rechazará todas las
+direcciones de dicho host. Por defecto está vacio.
+\item \emph{databytes} Máximo número de bytes permitidos por el mensaje. Si la
+variable de entorno DATABYTES esté definida, ignora databytes. Esto puede
+usarse con  ayuda del tcpserver para permitir diversos tamaños de mensaje en
+función del cliente que haga el relay.
+\item \emph{localiphost} Si este fichero existe, cuando se recibe un correo
+con  un recipiente del tipo @[a.b.c.d], se sustituirá por el contenido de este
+fichero. Si no se especifica ninguno se toma por defecto el del fichero me.
+Esto se hace antes de procesar el rcpthosts.
+\item \emph{morercpthosts}  Sirve para indicar dominios extras  que se
+permiten en el RCPT. En caso de modificar este fichero debe ejecutarse el
+el programa /var/qmail/bin/qmail-newmrh. 
+\item  \emph{rcpthosts} Dominios que se permiten en el RCPT. Si este fichero
+existe, se rechazará cualquier mensaje cuyo dominio no esté en este fichero.
+No debe arrancarse qmail-smtpd sin la existencia de este fichero porque en ese
+caso el sistema será permitirá transmitir correo a cualquiera, con los
+problemas de correo no solicitado\footnote{Conocido en la jerga de Internet
+como SPAM}. En el caso de que la variable RELAYCLIENT exista, se ignorará este
+fichero. Esta variable puede definirse con ayuda del tcpserver.
+\item \emph{smtpgreeting} Mensaje de saludo cuando se conecta un cliente. Por
+defecto el contenido del fichero \emph{me}. En caso contrario, la cadena
+contenida en este fichero. Hacer notar que la primera palabra debería ser el
+nombre del host donde corre qmail.
+\item \emph{timeoutsmtpd} Tiempo en segundos durante los cuales esperará por
+un buffet de datos del cliente remoto. Por defecto o sino existe 1200
+segundos.
+\end{itemize}
+
+\subsection{Entrada de correo via inyección local}
+
+El programa que inyecta el correo local es \emph{qmail-inject} (el envoltorio
+/var/qmail/bin/sendmail también llama a este programa). Este programa lee de
+la entrada estándar un mensaje, lo preprocesa y lo inyecta en la cola a través
+de \emph{qmail-queue}.
+
+Además \emph{qmail-inject} se asegura que la cabecera está correctamente
+construida, añadiendo ciertos campos en caso de que falten y rechazando
+aquellos mensajes con una cabecera corrupta.
+
+\emph{qmail-inject} permite el uso de VERP (variable envelope return path).
+Esta es una extensión de qmail para el manejo de listas de correo que permite
+asignarle un Return-Path: unico a cada subscritor de la lista y así ayudar a
+un diagnóstico y solución de problemas más rápido, puesto que usando VERP los
+errores permiten identificar automáticamente la dirección que falla (puesto
+que está incluida en el Return-Path:) mientras que en caso normal, el mensaje
+llegaria al administrador de la lista y habría que tratarlo manualmente.
+
+Las ficheros y variables de configuración del programa son los siguientes:
+
+\begin{itemize}
+\item \emph{defaultdomain} Si no existe este fichero, por defecto toma el
+valor de \emph{me}. En caso contrario, cualquier nombre de host que no tenga
+un punto, se le añadirá el contenido de este fichero (excepto aquellos que
+acaben en +  que se le añadirá el contenido de \emph{plusdomains}. Esto
+también es aplicable a \emph{defaulthost}. Si la variable de entorno
+\emph{QMAILDEFAULTDOMAIN} existe, su valor tiene preferencia sobre el
+contenido de este fichero.
+\item \emph{defaulthost} Nombre de host por defecto. Este valor por defecto es 
+\emph{me}. En caso de que exista el fichero, toma el valor especificado en el
+mismo. Este valor se añade a cualquier
+dirección que no presente un nombre de host. Si la variable de entorno
+\emph{QMAILDEFAULTHOST} existe, su valor tiene precedencia sobre el contenido
+de este fichero.
+\item \emph{idhost} Nombre de máquina usado para generar el campo de cabecera
+Message-Id. Por defecto este valor es el contenido de \emph{me}, tomando el
+valor especificado en el fichero en caso de que exista. Sin embargo, este
+fichero debe ser un FQDN dentro del dominio y cada host dentro del mismo debe
+de tener uno distinto. Si la variable de entorno \emph{QMAILIDHOST} existe, se
+usa su valor
+\item \emph{plusdomain} Este valor se añade a todos los nombres de máquina que
+acaben con un signo más, incluyendo lo especificado en defaulthost (si este
+acaba en un signo más). Si la variable de entorno \emph{QMAILPLUSDOMAIN}
+existe, se usa su valor.
+\item \emph{QMAILINJECT} Esta variable de entorno controla el comportamiento
+del programa en función de los valores que tenga:
+	\begin{itemize}
+		\item \textbf{c} Usa para el campo From direcciones con comentarios.
+						 Esto indica que en el campo From el nombre del
+destinatario estará entre paréntesis seguido de la dirección sin <>, por
+ejemplo (Carlos) terron@arrakis.es, frente al uso más común de Carlos
+<terron@arrakis.es>
+		\item \textbf{s} No use el campo Return-Path. Si no se especifica esta
+opción y en el mensaje que se le pasa a qmail-inject existe dicho campo, se
+usará para la dirección del remitente, tomando precedencia sobre todas las
+variables de entorno. De todas maneras, qmail-inject borra dicho campo del
+mensaje.
+		\item \textbf{f} Normalmente qmail-inject usa el campo From del
+mensaje - en caso de que no exista, genera uno -. Con esta opción, borrará
+el campo From del mensaje y generará uno.
+		\item \textbf{i} Borra el campo Message-ID si se le pasa uno,
+generando uno nuevo.
+		\item \textbf{r} Usa un VERP por destinatario. 
+return path). 
+		\item \textbf{m} Usa un VERP por mensaje.
+	\end{itemize}
+\end{itemize}
+
+Las opciones en que admite en las línea de comandos son las siguientes:
+
+\begin{itemize}
+\item \textbf{-a} Manda el  mensaje a los destinatarios que se indican
+en la linea de comando ignorando la información de cabecera que contenga el
+mensaje. 
+\item \textbf{-h} Manda el mensaje a los destinatarios que están en la
+cabecera del mismo.
+\item \textbf{-A} Opción por defecto. Manda el mensaje a los destinatarios que
+se le pasen en la linea de comandos, y en caso de que no existan, los que hay
+en la cabecera del mensaje.
+\item \textbf{-H} Manda el mensaje a los destinatarios que se le pase en la
+linea de comandos y a los que se indican en la cabecera del mensaje.
+\item \textbf{-f} Pasa como remitente la dirección que se le indique,
+ignorando el campo Return-Path: si existe en la cabecera del mensaje y todas
+las variables de entorno.
+\item \textbf{-N} Opción por defecto, pasa el mensaje a qmail-queue.
+\item \textbf{-n} Imprime el mensaje en vez de pasarse a qmail-queue.
+\end{itemize}
+
+\subsection{Encolado de correo}
+
+El programa encargado de meter un correo en la cola de salida  es \emph{qmail-queue}.
+Este programa lee el mensaje y la información del sobre (remitente y
+destinatario) y coloca el mensaje en la cola de correo para su posterior envio
+a través de \emph{qmail-send}.
+
+Aparte de esto, añade una linea de traza consistente en un campo Received.
+
+\subsection{Gestión de la cola de salida}
+
+El programa encargado de la misma es \emph{qmail-send}. Este programa llama a
+\emph{qmail-lspawn} si tiene que hacer una entrega de correo local, mientras
+que llama a \emph{qmail-rspawn} si la entrega de correo es remota.
+
+\emph{qmail-send}  puede recibir señales para termine (TERM) o bien para que
+intente mandar inmediatamente todo los mensajes de la cola (ALRM). Las señales
+pueden mandarse con ayuda del comando kill. Si recibe la señal HUP relee los
+ficheros de configuración locals y virtualdomains - para que relea el resto
+hay que parar y arrancar -.
+
+\emph{qmail-send} está conectado a \emph{qmail-lspawn}, \emph{qmail-rspawn} y
+\emph{qmail-clean}  a través de pipes, mandado los comandos adecuados a estos
+programas.
+
+
+Los diferentes ficheros de configuración que afectan a \emph{qmail-send} son
+los siguientes:
+
+\begin{itemize}
+\item  \emph{bouncefrom} El usuario desde donde salen los "bounces" o mensajes
+devueltos erroneamente. Por defecto MAILER-DAEMON
+\item  \emph{bouncehost} El host origen de los bounces. Por defecto me.  Normalmente un mensaje
+rebotado tendra el campo from como bouncefrom@bouncehost. Cuando se envia un
+mensaje de este tipo el remitente del sobre es una cadena vacía (si se mira el
+campo Return-Path: de un mensaje de este tipo es <>)
+\item  \emph{concurrencylocal} Número máximo de entregas de correo local
+simultaneas. Por defecto es 10 y puede aumentarse hasta 120. 
+\item  \emph{concurrencyremote} Número  máximo de entregas de correo remoto
+simultaneas. Por defecto es 10 y puede aumentarse hasta 120. Este parámetro es
+importante controlarlo, puesto que puede producirse un cuello de botella a la
+hora de la entrega remota de correo. Si se hace cero, para la entrega remota
+de correo.
+\item  \emph{doublebouncehost} Por defecto me, host al que se manda los double
+bouncer, es decir, aquellos mensajes de error que no han podido entregarse.  
+\item  \emph{doublebounceto} Usuario que recibe los double bounces, por
+defecto postmaster. 
+\item  \emph{envnoathost} Por defecto me, en caso contrario el contenido del
+fichero. Indica el dominio que se le añade a una dirección que no tenga "@".
+Es decir, si pasa una dirección que es terron y el contenido del fichero es
+arrakis.es, la dirección quedará reescrita como terron@arrakis.es
+\item  \emph{locals} Lista de dominios a los cuales se hace entrega local, un
+por linea. Por defecto me.
+\item  \emph{percenhack} Dominios donde el truco de reescritura de \% se
+aplica. Cualquier dominio listado en este fichero hace que una dirección del
+tipo user\%fqdn@dominio sea reescrita como user@fqdn. A su vez user puede
+tener \% con lo cual se puede volver a aplicar. Este proceso se lleva a cabo
+antes de procesar locals. 
+\item  \emph{queuelifetime} Número de segundos que un mensaje puede estar en
+la cola. Por defecto es una semana (604800).
+\item  \emph{virtualdomains} Lista de usuarios o dominios virtuales. Un
+usuario virtuales es de la forma user@dominio:prefijo. Cuando el qmail-send ve
+que el destinatario de un mensaje es user@dominio, lo reescribirá como
+prefijo-user@dominio y lo tratará como si fuera local.
+
+En el caso de un dominio virtual la linea sería dominio:prefijo. Cualquier
+destinatario de ese dominio sería reescrito como prefijo-destinatario@dominio
+y el mensaje sería tratado como si fuera local. 
+
+Se permiten caracteres comodines a la hora de definir los dominios virtuales,
+por ejemplo todo el mail que fuera a .loquesea.org incluyendo subdominios
+sería .loquesea.org:john, o incluso dejarlo vacio para que cogiera todo el
+correo con una linea del tipo :prefijo.
+
+Puesto que posteriormente se iniciará una entrega local de correo, este
+mecanismo permite usar las extensiones a las direcciones de qmail para
+gestionar los dominios virtuales.
+\end{itemize}
+
+Vpopmail modificará el fichero virtualdomains con los parámetros adecuados
+cuando se añade o borra un dominio.
+
+Cada cierto tiempo, qmail-send manda comandos a \emph{qmail-clean}  para limpiar la
+cola de correo.
+
+
+\subsection{Entrega de correo local}
+La entrega de correo local comienza cuando \emph{qmail-send} da instrucciones
+a \emph{qmail-lspawn}.
+
+Este proceso se arranca con un modo de entrega
+determinado (bien a un buzón en formato mbox tradicional, bien un maildir,
+parámetro que pasará a \emph{qmail-local}. 
+
+Se busca los usuarios que controlan las diferentes direcciones. Para ello se
+sigue el siguiente orden:
+\begin{enumerate}
+\item Mecanismo qmail-users. Se procesa el fichero
+\emph{/var/qmail/users/asigns}. En caso de que la dirección no esté gestionada
+por este mecanismo
+\item Se llama a \emph{qmail-getpw}, que se encarga de buscar la cuenta en
+los mecanismos normales del sistema operativo, fundamentalmente usando la
+llamada \emph{getpwnam}.
+\end{enumerate}
+
+Una vez obtenido esta información y chequeado una serie de parámetros de
+seguridad, \emph{qmail-lspawn} llamará a \emph{qmail-local} para hacer la
+entrega.
+
+\emph{qmail-local} añade un nuevo campo a la cabecera que es Delivered-To:
+indicando el destinatario del mensaje. Si ese mismo campo ya aparece en la
+cabecera, el mensaje rebotará (bounce) como error, puesto que se ha detectado
+un bucle - siempre que la entrega sea a un buzón local -.
+
+También añade un nuevo campo Return-Path: con el remitente del mensaje.
+
+\subsubsection{Extensiones de direcciones}
+
+La particularidad más importante que tiene qmail respecto a otros MTA es las
+extensiones de las direcciones. Cualquier usuario local, user, es capaz de
+controlar las direcciones user-loquesea. El comportamiento para la dirección
+user-loquesea es controlado por el fichero situado en el directorio
+\$HOME\footnote{En los shells de Unix esta variable contiene el directorio
+raíz del usuario}  del
+usuario user, por el fichero .qmail-loquesea. Es decir, un correo cuyo
+destinatario sea john-seguridad@dominio.com, si john es un usuario local del
+sistema, qmail seguirá las instrucciones contenidas en el fichero
+\$HOME/.qmail-seguridad. 
+
+Un detalle de este mecanismo es que si contiene "." la extensión se convierte
+en ":", para evitar que se pueda navegar por el árbol de directorios a la hora
+de leer los ficheros.
+
+El contenido del fichero \emph{.qmail-extension}  permite controlar la entrega
+del correo. El formato de dicho fichero es el siguiente:
+\begin{itemize}
+\item Comentarios: un \# al principio de la linea.
+\item Un programa al que se le pasa el mensaje. Para ello se utiliza el
+símbolo del pipe "|" seguido del comando que se quiere ejecutar. En este caso
+\emph{qmail-local} lo ejecutará como sh -c comando, enviando a la entrada
+estándar del mismo el mensaje. En este caso no se añaden las cabeceras
+\emph{Delivered-To:} o \emph{Return-Path:}. Además se establecen una serie de
+variables de entorno, entre otras \emph{SENDER} con la dirección del
+remitente, \emph{RECIPIENT} con la dirección del destinatario, \emph{LOCAL} la
+parte local de la dirección, \emph{HOST} la parte de dominio, etc. La lista
+completa de variables se encuentra en la página de manual
+\emph{qmail-command}.
+\item Un forward. Hace que el mensaje sea reenviado a la dirección que que se
+especifique después de un "\&". Por ejemplo, si el usuario jeff quiere reenviar
+todo su correo a jeff@otrodominio.com, pondria una linea en su \$HOME/.qmail
+que sería \&jeff@otrodominio.com.
+\item Un buzón tipo \emph{mbox}. Para ello una linea que comienza con "/" o
+. y que no termina en "/" indicando el nombre del buzón. Por ejemplo que todo
+el correo vaya a /home/jeff/buzon, en \$HOME/.qmail sería: "/home/jeff/buzon".
+\item Un buzón de tipo \emph{Maildir}. Exactamente igual que el anterior solo
+que la ruta acaba en el buzón \emph{Maildir} (creado con \emph{maildirmake}),
+acabe en "/". Si el buzón está en el directorio \$HOME/Maildir, el contenido
+sería ./Maildir/ - puesto que qmail-local se ejecuta en el directorio \$HOME
+del usuario al que le entrega el correo -.
+\end{itemize}
+
+A la hora de procesar las direcciones qmail, sigue el siguiente orden:
+\begin{enumerate}
+\item Si la dirección no tiene extensión, es decir es el usuario a secas, y no
+existe el fichero \$HOME/.qmail, simplemente lo trata como si estuviera vacio,
+entregando el correo por defecto.
+\item Si existen extensiones en la dirección de entrega:
+	\begin{enumerate}
+		\item Si existe \emph{.qmail-extension} se siguen las instrucciones
+del fichero.
+		\item Si no existe lo anterior, se quita una extension y se intenta 
+		\emph{.qmail-extension.recortada-default}, así hasta que se llega a 
+		\emph{.qmail-default}, que en caso de que no exista hace que se 
+		produzca un bounce con el mensaje. Así si la dirección es
+terron-seguridad-microsoft@arrakis.es, los ficheros serían
+\emph{.qmail-seguridad-microsoft}, \emph{.qmail-seguridad-default}  y
+\emph{.qmail-default}.
+	\end{enumerate}
+\end{enumerate}    
+
+En caso de que un mensaje sea reenviado desde un fichero
+\emph{.qmail-extension} puede controlarse la dirección del remitente y además
+generar VERP.
+
+Así si un mensaje es entregado a user-extension@dominio.com, gestionado por
+\$HOME/.qmail-extension (o bien el está en el \$HOME/.qmail-default), si
+existe el fichero \$HOME/.qmail-user-extension-owner, el remitente del mensaje
+cambiará a user-extension-owner@dominio.com.
+
+Si lo que se desea es crear un VERP a cada mensaje que se reenvia, se deben de
+crear los ficheros \$HOME/.qmail-user-extension-owner y
+\$HOME/.qmail-user-extension-owner-default, esto cambiará el remitente del
+mensaje a user-extension-@dominio-@[].
+
+Estas extensiones de direcciones permiten la fácil creación de listas de
+correo por parte del usuario sin necesidad de molestar a los adminitradores de
+sistema\footnote{De hecho, el paquete ezlml, del mismo autor de qmail usa todo
+estos mecanismos}.
+
+\subsubsection{Alias locales}
+
+Hasta ahora, se ha hablado de direcciones asociadas a usuarios locales. ¿Pero
+que ocurre con los alias tradicionales?. qmail resuelve este problema con
+ayuda de un usuario alias y de ficheros .qmail creado en dicho usuario. Por
+defecto estos alias se situan en /var/qmail/alias. Así se crean los alias para
+root - recordemos que qmail nunca entrega correo al usuario uid = 0 -,
+mailer-daemon y postmaster.
+
+\subsection{Entrega de correo remoto}
+
+El módulo \emph{qmail-rspawn} es el encargado de recibir desde
+\emph{qmail-send} las instrucciones para la entrega remota. Posteriormente
+ejecuta \emph{qmail-remote} de manera asíncrona para efectar las entregas.
+Todas estas instrucciones las recibe a través de pipes.
+
+La linea de comandos con la cual se llama \emph{qmail-remote} es:
+\begin{verbatim}
+  qmail-remote host sender recip [ recip ...  ]
+\end{verbatim}
+
+Donde \emph{host} es el MX o la máquina a la cual se le envia el correo,
+\emph{sender} es la dirección del remitente, y \emph{recip} son los destinatarios.
+\emph{qmail-remote} impone una serie de restricciones a los mensajes para que
+sean válidos según el protocolo SMTP: hace terminar las lineas con CRLF y
+duplica los "." que están han principio de linea. Es decir, si una linea
+empieza por ".", se convierte en "..".
+
+Los ficheros de configuración que utiliza \emph{qmail-remote} son los
+siguientes:
+\begin{itemize}
+\item \emph{helohost} cadena que se manda a un host remoto en el EHLO o HELO.
+Por defecto me, en caso contrario el contenido de este fichero.
+\item \emph{smtproutes} este fichero permite controlar las rutas que va a
+seguir el correo en función de los dominios.  Su contenido son lineas tal
+que:
+\begin{verbatim}
+dominio:relay
+\end{verbatim}
+
+El dominio indica hacia donde va el correo. El relay es la máquina hacia donde
+ese dominio debe rutarse. Opcionalmente \emph{relay} puede contener un puerto
+determinado, separado por dos puntos.
+
+A la hora de indicar el dominio se puede usar comodines. Por ejemplo .us.es
+ indica todas las máquinas que están por debajo del dominio us.es sin incluir
+éste. Si dominio está vacio (es decir es una línea del tipo :relay), significa
+que todo el correo se rutará por relay, mientras que si lo que está vacio es
+relay, significa que ese dominio sigue el mecanismo normal de MX.
+\item \emph{timeoutconnect} Número de segundos que esperará para conectar con
+un sistema remoto. Por defecto es 60. El kernel del sistema en el que se
+ejecute qmail afecta sobre el máximo valor que puede tomar este parámetro.
+\item \emph{timeoutremote} Número de segundos que se esperará a las respuestas
+del servidor remoto. Por defecto 60. Al igual que le caso anterior, este
+parámetro puede verse influido por el kernel sobre el cual se ejecuta qmail.
+\end{itemize}
+
+\subsection{Asignación de direcciones de correo a usuarios}
+
+Este mecanismo permite asignar varias direcciones a un mismo usurio. Vpopmail
+hace uso de él para implementar toda la gestión de dominios virtuales con un
+sólo usuario.
+
+La asignación de direcciones se realiza en el fichero
+\emph{/var/qmail/users/assign}. Cada una de las asignaciones ocupa una linea y
+el fichero acaba con un ".".
+
+Tenemos dos tipos de asignación:
+\begin{itemize}
+\item Asignación simple. En este caso no se permiten direcciones comodín. Una
+asignación simple tiene la forma:
+\begin{verbatim}
+=local:user:uid:gid:homedir:dash:ext:
+\end{verbatim}
+Así \emph{local} controla la dirección local que se trata, \emph{user} el
+usuario local de la máquina, \emph{uid} el user id, \emph{gid} el group id,
+\emph{homedir} el directorio casa del usuario\footnote{realmente no tiene
+porqué ser así}, \emph{dash} ("-")  y \emph{ext}  sirven para hacer referencia al
+fichero \emph{.qmail-ext} que en \emph{homedir} controlará la dirección.
+\item Asignación con comodines. Cada línea de extensión de comodines tiene la
+siguiente forma:
+\begin{verbatim}
++loc:user:uid:gid:homedir:dash:pre:
+\end{verbatim}
+Una línea de este tipo será válida para cualquier dirección que comience por
+loc. El resto de los campos son iguales al caso anterior.
+\end{itemize}
+
+Existe una prioridad en cuanto a las asignaciones, teniendo más precedencia
+una asignación simple,y posteriormente aquella que sea más específica en caso
+de estar usando asignaciones con comodines.
+
+Esta información se compila en un fichero especial para acceder a ella lo más
+rápidamente posible. Para ello se ejecuta el programa \emph{qmail-newu}. 
+
+\subsection{qmail y vpopmail}
+
+En este apartado se comenta cual es el proceso que sigue vpopmail a la hora de
+añadir dominios y usuarios al sistema de correo y como se produce esa
+integración con qmail.
+
+Cuando se añade un dominio nuevo, se modifica \emph{rcpthosts}, añadiendo el
+nuevo dominio del que va a ser uso, se añade una línea a \emph{virtualdomains}
+de tal manera que el prefijo que se usará será el mismo nombre de dominio.
+
+Por último se modifica el fichero \emph{/var/qmail/users/assign} con una linea
+de tipo comodín que hará que todo el correo hacia dominio.com, sea entregado
+hacia el usuario con el cual se compiló vpopmail. Posteriormente, para cada
+usuario que crea, aparte de darlo de alta en la base de datos - para su uso
+con pop e imap - , simplemente crea un fichero \emph{.qmail-user} en el
+directorio especificado en la linea de assign, y bajo ese directorio se crea
+los buzones Maildir de cada usurio.
+
+Cuando se crea un nuevo dominio siempre se crea el usuario postmaster,
+necesario según las RFC de correo electrónico.
+
+Un fichero \emph{.qmail-default} se crea para cazar todos los usuarios que no
+existen y devolver el mensaje de error correspondiente (en este fichero lo que
+se hace es llamar al programa vdelivermail).con el cual se compiló vpopmail.
+Posteriormente, para cada usuario que crea, aparte de darlo de alta en la base
+de datos - para su uso con pop e imap - , simplemente crea un fichero
+\emph{.qmail-user} en el directorio especificado en la linea de assign.
+
+Un fichero \emph{.qmail-default} se crea para cazar todos los usuarios que no
+existen y devolver el mensaje de error correspondiente (en este fichero lo que
+se hace es llamar al programa vdelivermail).
+
+
+
+
