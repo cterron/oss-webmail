@@ -279,8 +279,8 @@ XXX.
 qmail se arranca a través de svscan. Para ello, es necesario poner los scripts
 creados en los apartados anteriores bajo el control del mismo:
 \begin{verbatim}
-ln -s /service/qmail /var/qmail/supervise/qmail
-ln -s /service/qmail-smtpd /var/qmail/supervise/qmail-smtpd
+ln -s  /var/qmail/supervise/qmail /service/qmail
+ln -s /var/qmail/supervise/qmail-smtpd /service/qmail-smtpd 
 \end{verbatim}
 
 Con estas instruciones debe de estar arrancado qmail. Debe de probarse que
